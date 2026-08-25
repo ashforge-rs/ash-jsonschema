@@ -1,0 +1,27 @@
+[package]
+name = "ash-jsonschema-builder"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Giorgos Ntemiris <gntem@users.noreply.github.com>"]
+description = "A typed builder for JSON Schema 2020-12 — chain the keywords, call .build(), get a schema."
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/ashforge-rs/ash-jsonschema"
+keywords = ["jsonschema", "json-schema", "builder", "schema", "validation"]
+categories = ["data-structures", "encoding", "rust-patterns"]
+
+[dependencies]
+# The schema tree is a plain `Serialize` document; serde's derive writes the
+# keyword renames (`$id`, `multipleOf`, …) and drops every unset keyword.
+serde = { version = "1", features = ["derive"] }
+# `serde_json::Value` is the natural carrier for the schema keywords that take
+# an arbitrary JSON instance (`const`, `default`, `enum`, `examples`), and it is
+# what a built schema renders into — and what the meta-schema is checked as.
+serde_json = "1"
+# The meta-schema asserts two `pattern`s (the `$anchor` grammar and the
+# no-fragment rule for `$id`), so checking a built schema needs a real regex
+# engine. `regex-lite` rather than `regex`: the patterns are fixed, tiny, and
+# compiled once at load, so none of the larger crate's throughput work would
+# ever pay for its dependencies or compile time.
+regex-lite = "0.1"
