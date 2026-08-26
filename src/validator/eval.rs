@@ -91,6 +91,8 @@ pub(crate) struct Evaluator<'c> {
     /// costs a clone per annotation keyword per instance location and the
     /// common case never reads it.
     pub(crate) annotations: Option<Vec<Unit>>,
+    /// Annotations produced by the branch that just ran, awaiting its verdict.
+    pub(crate) pending: Vec<Unit>,
 }
 
 /// The keywords that produce an annotation rather than an assertion.
@@ -196,7 +198,7 @@ impl Evaluator<'_> {
     /// that may yet fail cannot be kept, because the specification drops the
     /// annotations of any schema that did not match.
     fn collect_annotations(&mut self, map: &Map<String, Value>, at: Where<'_>) {
-        if self.annotations.is_none() || self.silent > 0 {
+        if self.annotations.is_none() {
             return;
         }
         for keyword in ANNOTATION_KEYWORDS {
@@ -242,10 +244,32 @@ impl Evaluator<'_> {
     fn silently<T>(&mut self, body: impl FnOnce(&mut Self) -> T) -> (T, Vec<Unit>) {
         self.frames.push(Vec::new());
         self.silent += 1;
+        // Annotations are held aside for the same reason the units are: what
+        // a branch has to say counts only if the branch matched, and that is
+        // not known until it has run. The caller keeps them with
+        // `keep_annotations` or drops them by doing nothing.
+        let held = self
+            .annotations
+            .as_mut()
+            .map(std::mem::take);
         let value = body(self);
         self.silent -= 1;
         let collected = self.frames.pop().unwrap_or_default();
+        if let (Some(held), Some(current)) = (held, self.annotations.as_mut()) {
+            // Put back what was collected before the branch; the branch's own
+            // annotations are now in `self.pending`.
+            self.pending = std::mem::replace(current, held);
+        }
         (value, collected)
+    }
+
+    /// Keeps the annotations a branch produced, now that it is known to have
+    /// matched.
+    fn keep_annotations(&mut self) {
+        let branch = std::mem::take(&mut self.pending);
+        if let Some(collected) = self.annotations.as_mut() {
+            collected.extend(branch);
+        }
     }
 
     /// Evaluates `schema` against `instance`, returning whether it matched and
@@ -944,6 +968,7 @@ impl Evaluator<'_> {
                 if ok {
                     matched = true;
                     // Only a *successful* branch contributes annotations.
+                    self.keep_annotations();
                     evaluated.absorb(seen);
                 } else {
                     evidence.push(self.branch_unit(inner, branch));
@@ -968,6 +993,7 @@ impl Evaluator<'_> {
         if let Some(Value::Array(branches)) = map.get("oneOf") {
             let mut matches = Vec::new();
             let mut winner = Evaluated::default();
+            let mut winning_annotations = Vec::new();
             let mut evidence = Vec::new();
             for (index, schema) in branches.iter().enumerate() {
                 let keyword = format!("{}/oneOf/{index}", at.keyword);
@@ -982,12 +1008,19 @@ impl Evaluator<'_> {
                 if ok {
                     matches.push(index);
                     winner = seen;
+                    winning_annotations = std::mem::take(&mut self.pending);
                 } else {
                     evidence.push(self.branch_unit(inner, branch));
                 }
             }
             match matches.len() {
-                1 => evaluated.absorb(winner),
+                1 => {
+                    // Exactly one alternative is the schema in force, so only
+                    // its annotations describe the instance.
+                    self.pending = winning_annotations;
+                    self.keep_annotations();
+                    evaluated.absorb(winner);
+                }
                 0 => {
                     let mut unit = self.unit(
                         at,
@@ -1052,6 +1085,7 @@ impl Evaluator<'_> {
 
             let branch = match matched {
                 true => {
+                    self.keep_annotations();
                     evaluated.absorb(seen);
                     "then"
                 }
@@ -1162,6 +1196,7 @@ pub(crate) fn run(
         silent: 0,
         depth: 0,
         annotations: annotations.then(Vec::new),
+        pending: Vec::new(),
     };
     let root = compiled.root();
     let scope = [compiled.base().to_owned()];

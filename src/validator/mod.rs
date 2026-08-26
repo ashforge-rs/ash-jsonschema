@@ -368,8 +368,8 @@ impl ValidatorBuilder {
     ///
     /// ```
     /// # use ash_jsonschema_builder::{Schema, Validator};
-    /// # use ash_jsonschema_builder::validator::tld::has_registered_tld;
     /// # #[cfg(feature = "iana-tlds")] {
+    /// # use ash_jsonschema_builder::validator::tld::has_registered_tld;
     /// let schema = Schema::string().format("hostname").build().unwrap();
     ///
     /// let validator = Validator::builder(&schema)

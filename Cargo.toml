@@ -67,6 +67,14 @@ required-features = ["validation"]
 name = "formats"
 required-features = ["validation"]
 
+[[test]]
+name = "output"
+required-features = ["validation"]
+
 [[example]]
 name = "formats"
+required-features = ["validation"]
+
+[[example]]
+name = "output"
 required-features = ["validation"]

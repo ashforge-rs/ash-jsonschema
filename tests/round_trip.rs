@@ -218,3 +218,25 @@ fn the_object_conveniences_match_their_long_forms() {
         &["a"],
     );
 }
+
+/// JSON has one number type, so `1.0` and `1` are the same value written two
+/// ways and the meta-schema's `nonNegativeInteger` admits both. Rejecting the
+/// decimal form would refuse a schema the specification calls valid.
+#[test]
+fn a_count_keyword_accepts_the_decimal_spelling_of_an_integer() {
+    let schema = Schema::parse(r#"{"minItems": 1.0, "maxLength": 3.0}"#).unwrap();
+
+    // Normalised on the way in, so the round trip is the integer form.
+    assert_eq!(schema.to_json(), r#"{"maxLength":3,"minItems":1}"#);
+}
+
+#[test]
+fn a_count_keyword_still_refuses_what_is_not_a_count() {
+    for bad in [r#"{"minItems": 2.5}"#, r#"{"minItems": -1}"#] {
+        let error = Schema::parse(bad).unwrap_err().to_string();
+        assert!(
+            error.contains("non-negative integer"),
+            "`{bad}` should be refused as a count, got: {error}",
+        );
+    }
+}

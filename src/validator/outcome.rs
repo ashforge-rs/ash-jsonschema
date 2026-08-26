@@ -277,7 +277,12 @@ pub type ValidationError = Unit;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Outcome {
     /// The run's root unit, with every nested unit beneath it.
-    root: Unit,
+    ///
+    /// Boxed to keep `Outcome` small: it is returned as the `Err` of
+    /// [`check`](crate::Validator::check), and an error type that has to be
+    /// memcpy'd through every `?` is a cost paid on the path where nothing
+    /// went wrong.
+    root: Box<Unit>,
     /// The failing leaves, in document order. Empty when the instance is valid.
     ///
     /// Flattened once when the outcome is built, since almost every caller
@@ -323,7 +328,7 @@ impl Outcome {
             false => Vec::new(),
         };
         Self {
-            root,
+            root: Box::new(root),
             errors,
             annotations,
         }
@@ -616,6 +621,7 @@ mod tests {
             absolute_keyword_location: None,
             instance_location: String::new(),
             error: Some("no alternative matched".to_owned()),
+            annotation: None,
             errors: vec![error("/a"), error("/b")],
         }]);
 
@@ -667,6 +673,7 @@ mod tests {
             absolute_keyword_location: None,
             instance_location: String::new(),
             error: Some("no alternative matched".to_owned()),
+            annotation: None,
             errors: vec![error("/a")],
         }]);
 
@@ -686,6 +693,7 @@ mod tests {
             absolute_keyword_location: None,
             instance_location: String::new(),
             error: Some("no alternative matched".to_owned()),
+            annotation: None,
             errors: vec![error("/a")],
         }]);
 
@@ -705,6 +713,7 @@ mod tests {
             absolute_keyword_location: None,
             instance_location: String::new(),
             error: None,
+            annotation: None,
             errors: Vec::new(),
         };
         let outcome = failing(vec![passing, error("/a")]);

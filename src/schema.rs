@@ -474,10 +474,20 @@ pub struct SchemaObject {
 
     // --- validation: strings ---------------------------------------------
     /// `maxLength` — in Unicode code points, not bytes.
-    #[serde(rename = "maxLength", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "maxLength",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "count",
+        default
+    )]
     pub max_length: Option<u64>,
     /// `minLength` — in Unicode code points, not bytes.
-    #[serde(rename = "minLength", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "minLength",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "count",
+        default
+    )]
     pub min_length: Option<u64>,
     /// `pattern` — an ECMA-262 regular expression, unanchored.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -497,16 +507,36 @@ pub struct SchemaObject {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contains: Option<Box<Schema>>,
     /// `maxContains` — upper bound on `contains` matches.
-    #[serde(rename = "maxContains", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "maxContains",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "count",
+        default
+    )]
     pub max_contains: Option<u64>,
     /// `minContains` — lower bound on `contains` matches.
-    #[serde(rename = "minContains", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "minContains",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "count",
+        default
+    )]
     pub min_contains: Option<u64>,
     /// `maxItems` — upper bound on element count.
-    #[serde(rename = "maxItems", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "maxItems",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "count",
+        default
+    )]
     pub max_items: Option<u64>,
     /// `minItems` — lower bound on element count.
-    #[serde(rename = "minItems", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "minItems",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "count",
+        default
+    )]
     pub min_items: Option<u64>,
     /// `uniqueItems` — no two elements may be equal.
     #[serde(rename = "uniqueItems", skip_serializing_if = "Option::is_none")]
@@ -536,10 +566,20 @@ pub struct SchemaObject {
     #[serde(rename = "propertyNames", skip_serializing_if = "Option::is_none")]
     pub property_names: Option<Box<Schema>>,
     /// `maxProperties` — upper bound on property count.
-    #[serde(rename = "maxProperties", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "maxProperties",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "count",
+        default
+    )]
     pub max_properties: Option<u64>,
     /// `minProperties` — lower bound on property count.
-    #[serde(rename = "minProperties", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "minProperties",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "count",
+        default
+    )]
     pub min_properties: Option<u64>,
     /// `dependentRequired` — one property's presence requires others.
     #[serde(rename = "dependentRequired", skip_serializing_if = "Option::is_none")]
@@ -658,6 +698,34 @@ fn present_or_absent<'de, D: Deserializer<'de>>(
     deserializer: D,
 ) -> Result<Option<Value>, D::Error> {
     Value::deserialize(deserializer).map(Some)
+}
+
+/// Reads a count keyword — `minItems`, `maxLength`, and their kind.
+///
+/// JSON has one number type, so `1.0` and `1` are the same value written two
+/// ways, and the meta-schema's `nonNegativeInteger` admits both. Serde's `u64`
+/// does not, which would reject a schema the specification calls valid — so
+/// an integral float is accepted and anything with a real fraction is not.
+fn count<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::Error> {
+    use serde::de::Error;
+
+    match Option::<serde_json::Number>::deserialize(deserializer)? {
+        None => Ok(None),
+        Some(number) => {
+            if let Some(value) = number.as_u64() {
+                return Ok(Some(value));
+            }
+            // `2.0` counts; `2.5` and `-1` do not.
+            match number.as_f64() {
+                Some(value) if value.fract() == 0.0 && value >= 0.0 && value <= u64::MAX as f64 => {
+                    Ok(Some(value as u64))
+                }
+                _ => Err(D::Error::custom(format!(
+                    "expected a non-negative integer, found {number}"
+                ))),
+            }
+        }
+    }
 }
 
 /// A JSON Schema.

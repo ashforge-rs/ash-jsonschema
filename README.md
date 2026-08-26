@@ -401,11 +401,63 @@ the instance is not valid (5 errors)
   - /extra: is not a permitted property [/additionalProperties]
 ```
 
-Each error carries two pointers, because they answer different questions:
-`location` is where in *your data* the problem is, `keyword` is which rule in the
-*schema* rejected it. `outcome.at("/total")` filters to one part of the payload,
-`check()` gives a `Result` for `?`, and `check_value()` takes anything
-`Serialize`.
+Each error carries the locations the specification defines, because they answer
+different questions: `instance_location` is where in *your data* the problem is,
+`keyword_location` is which rule in the *schema* rejected it, and
+`absolute_keyword_location` names the resolved URI once a `$ref` was crossed and
+the first two no longer say which document you are in.
+`outcome.at("/total")` filters to one part of the payload, `check()` gives a
+`Result` for `?`, and `check_value()` takes anything `Serialize`.
+
+### The four output formats
+
+2020-12 specifies how a validation result crosses a process boundary, and
+`outcome.output(format)` renders all four of them. The result validates against
+`https://json-schema.org/draft/2020-12/output/schema`, so tooling that has never
+heard of this crate can read it.
+
+| Format | What it holds |
+| --- | --- |
+| `Flag` | `{"valid": false}` — the verdict alone |
+| `Basic` | the verdict plus one flat list of error leaves |
+| `Detailed` | the error *tree*, with branch structure kept |
+| `Verbose` | every unit, including the ones that passed |
+
+The difference matters most where a schema branches. A failed `anyOf` reports
+"does not match any permitted alternative", which on its own is the least useful
+thing a validator can say — the question is *which alternative was meant, and
+how close did it come*. So the evaluator keeps each branch's reasons:
+
+```text
+the instance is not valid (2 errors)
+  - (root): expected string, found object [/anyOf/0/type]
+  - (root): `iban` is required [/anyOf/1/required]
+```
+
+`Detailed` keeps that as a tree, each reason nested under the alternative it
+belongs to. `outcome.unit()` is the same tree in Rust.
+
+### Annotations
+
+`title`, `description`, `default`, `readOnly` and their kind assert nothing —
+they attach information to the instance location they were reached at.
+`annotate()` collects them; `validate()` does not, because the common question
+is *is this valid* and it should not pay for an answer it will not read.
+
+```rust
+let outcome = validator.annotate(&instance, Mode::All);
+for unit in &outcome.annotations {
+    println!("{} {} = {}", unit.instance_location, unit.keyword(),
+             unit.annotation.clone().unwrap_or_default());
+}
+```
+
+A run that fails produces none, and neither does an alternative that did not
+match: an annotation from a rejected schema describes an instance that does not
+exist.
+
+`cargo run --example output` shows all four formats and the annotations from one
+run.
 
 ### Coverage
 
@@ -415,9 +467,11 @@ against the runtime dynamic scope, and `$ref` across documents via a `Registry`.
 
 Measured against the official
 [JSON-Schema-Test-Suite](https://github.com/json-schema-org/JSON-Schema-Test-Suite):
-**1267 of 1278 draft2020-12 cases pass (99.1%)**. The remainder are custom
-`$vocabulary` declarations that disable keywords, and `$dynamicRef` resolution
-across several intermediate scopes.
+**1281 of 1299 draft2020-12 cases pass (98.6%)**, and the suite's own output
+tests pass **4 of 4**. The remainder are custom `$vocabulary` declarations that
+disable keywords, `$dynamicRef` resolution across several intermediate scopes,
+and five patterns needing Unicode property escapes (`\p{Letter}`), which
+`regex-lite` does not implement.
 
 The content vocabulary is not asserted — 2020-12 defines it as an annotation.
 `pattern` uses `regex-lite`, so a pattern needing lookahead or backreferences is
@@ -509,6 +563,12 @@ and a schema is often built before the documents it points at exist.
 Documents nested past roughly fifty levels of subschema report a depth violation
 rather than being checked to the bottom: the evaluator stops instead of risking
 a stack overflow, which would abort the process uncatchably.
+
+## Where this is going
+
+[`ROADMAP.md`](ROADMAP.md) records the plan the crate was built against, what
+each phase cost, and what is deliberately not being done — including the
+recommendation about instance validation that turned out to be wrong.
 
 ## Development
 
