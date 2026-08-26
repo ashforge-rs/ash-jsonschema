@@ -362,10 +362,71 @@ schemas. `export_at` lifts a subschema out as a `Schema` rather than the bare
 `Value` that `pointer()` returns; it yields `None` for a location that is not a
 schema, so `/properties` (a map of them) does not count.
 
+## Validating instances
+
+The rest of the crate treats a schema as a document. `Validator` is the other
+half: given a schema, does this JSON satisfy it?
+
+```rust
+let order = validator! {
+    object! {
+        required "id": Schema::string().min_length(1),
+        required "total": Schema::integer().minimum(0),
+    }
+    .closed()
+}?;
+
+assert!(order.is_valid(&json!({"id": "a1", "total": 250})));
+```
+
+The schema is fixed once the validator holds it. There is no method that
+replaces it, and `export_schema()` hands back a detached copy — to check against
+something else, build another validator. Compiling is also where a *schema* can
+be wrong: every `pattern` is compiled and every reference indexed up front, so a
+validator that exists is one whose schema was understood, and `validate` has no
+failure mode of its own.
+
+### Two modes, one result type
+
+`Mode::All` reports everything; `Mode::FailFast` stops at the first error.
+
+```text
+the instance is not valid (5 errors)
+  - /items: must have at least 1 item [/properties/items/minItems]
+  - /total/amount: must be at least 0 [/properties/total/properties/amount/minimum]
+  - /total/currency: must match /^[A-Z]{3}$/ [/properties/total/properties/currency/pattern]
+  - /total/vat: is not a permitted property [/properties/total/additionalProperties]
+  - /extra: is not a permitted property [/additionalProperties]
+```
+
+Each error carries two pointers, because they answer different questions:
+`location` is where in *your data* the problem is, `keyword` is which rule in the
+*schema* rejected it. `outcome.at("/total")` filters to one part of the payload,
+`check()` gives a `Result` for `?`, and `check_value()` takes anything
+`Serialize`.
+
+### Coverage
+
+Every assertion and applicator of 2020-12, including `unevaluatedProperties` and
+`unevaluatedItems` with the annotation collection they require, `$dynamicRef`
+against the runtime dynamic scope, and `$ref` across documents via a `Registry`.
+
+Measured against the official
+[JSON-Schema-Test-Suite](https://github.com/json-schema-org/JSON-Schema-Test-Suite):
+**1267 of 1278 draft2020-12 cases pass (99.1%)**. The remainder are custom
+`$vocabulary` declarations that disable keywords, and `$dynamicRef` resolution
+across several intermediate scopes.
+
+Two things are deliberately not asserted: `format`, which 2020-12 defines as an
+annotation by default, and the content vocabulary, which is likewise an
+annotation. `pattern` uses `regex-lite`, so a pattern needing lookahead or
+backreferences is reported at construction rather than silently not applying.
+
 ## What this crate does not do
 
-It **builds** and **reads** schemas; it does not validate instances against
-them.
+It **builds**, **reads**, and **checks against** schemas. What it does not do is
+fetch: no `$ref` is ever retrieved over the network, and no schema is generated
+from a Rust type.
 
 The meta-schema check constrains a schema's *shape* — that `$anchor` is a plain
 name, that `$id` carries no fragment, that `multipleOf` is positive, that

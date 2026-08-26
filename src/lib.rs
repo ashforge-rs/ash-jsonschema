@@ -203,10 +203,37 @@
 //! bare [`serde_json::Value`]. Both are on [`FrozenSchema`] too, and `export`
 //! is on every builder — where it takes a copy without ending the chain.
 //!
+//! ## Validating instances
+//!
+//! [`Validator`] answers the other question: does this JSON satisfy the schema?
+//!
+//! ```
+//! # use ash_jsonschema_builder::{Schema, Validator, object};
+//! # use ash_jsonschema_builder::validator::Mode;
+//! let validator = Validator::new(&object! {
+//!     required "id": Schema::string().min_length(1),
+//! }.build()?)?;
+//!
+//! assert!(validator.is_valid(&serde_json::json!({"id": "a1"})));
+//!
+//! let outcome = validator.validate(&serde_json::json!({}), Mode::All);
+//! assert_eq!(outcome.first().unwrap().message, "`id` is required");
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! A validator's schema is fixed for its life. [`Mode::All`] reports every
+//! error and [`Mode::FailFast`] stops at the first; both give an [`Outcome`]
+//! whose errors name where in the instance the problem is *and* which schema
+//! keyword rejected it.
+//!
+//! Coverage is every assertion and applicator of the dialect, including
+//! `unevaluated*` and `$dynamicRef`. `format` and the content vocabulary are
+//! annotations in 2020-12 and are not asserted.
+//!
 //! ## What this crate does not do
 //!
-//! It **builds** and **reads** schemas; it does not validate instances against
-//! them. The
+//! It **builds**, **reads**, and **checks against** schemas. What it does not
+//! do is fetch — no `$ref` is retrieved over the network. The
 //! meta-schema check `.build()` runs constrains a schema's *shape* — that
 //! `$anchor` is a plain name, that `required` holds unique strings, that
 //! `minLength` is not negative — and says nothing about whether the schema
@@ -233,6 +260,7 @@ pub mod meta;
 pub mod registry;
 pub mod schema;
 pub mod uri;
+pub mod validator;
 mod validate;
 pub mod walk;
 
@@ -252,6 +280,7 @@ pub use schema::{
     is_dialect_keyword,
 };
 pub use validate::validate_document;
+pub use validator::{CompileError, Mode, Outcome, ValidationError, Validator};
 
 /// The types a typical caller wants in scope.
 ///

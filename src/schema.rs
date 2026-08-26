@@ -443,7 +443,16 @@ pub struct SchemaObject {
     #[serde(rename = "enum", skip_serializing_if = "Option::is_none")]
     pub enumeration: Option<Vec<Value>>,
     /// `const` — the instance must equal this value.
-    #[serde(rename = "const", skip_serializing_if = "Option::is_none")]
+    ///
+    /// `Some(Value::Null)` is the keyword written as `"const": null`, which
+    /// accepts only `null`; `None` is the keyword being absent, which accepts
+    /// anything. JSON gives those very different meanings, so the two are read
+    /// back distinctly rather than both landing on `None`.
+    #[serde(
+        rename = "const",
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_or_absent"
+    )]
     pub constant: Option<Value>,
 
     // --- validation: numbers ---------------------------------------------
@@ -582,7 +591,11 @@ pub struct SchemaObject {
 
     // --- metadata: annotations --------------------------------------------
     /// `default` — a suggested value, asserted by nothing.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    ///
+    /// As with [`constant`](Self::constant), an explicit `null` is kept as
+    /// `Some(Value::Null)` rather than being conflated with the keyword's
+    /// absence.
+    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "present_or_absent")]
     pub default: Option<Value>,
     /// `examples` — sample instances, asserted by nothing.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -634,6 +647,18 @@ impl SchemaObject {
 // ---------------------------------------------------------------------------
 // The schema
 // ---------------------------------------------------------------------------
+
+/// Reads a keyword whose value may legitimately be `null`.
+///
+/// `Option<Value>` normally collapses the two cases: serde hands an explicit
+/// `null` to `Option::deserialize`, which reads it as `None` — indistinguishable
+/// from the keyword not being there. For `const` and `default` that difference
+/// is the whole meaning, so this reads the value first and wraps it after.
+fn present_or_absent<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Value>, D::Error> {
+    Value::deserialize(deserializer).map(Some)
+}
 
 /// A JSON Schema.
 ///

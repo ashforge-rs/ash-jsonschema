@@ -112,6 +112,50 @@ pub fn remove_dot_segments(uri: &str) -> String {
     format!("{prefix}{}", segments.join("/"))
 }
 
+/// Decodes the percent-escapes in a URI fragment.
+///
+/// A fragment is part of a URI, so a JSON Pointer written in one is
+/// percent-encoded: a property named `percent%field` is referenced as
+/// `#/$defs/percent%25field`, and a `"` in a name as `%22`. The pointer has to
+/// be decoded before it is resolved, or it names nothing.
+///
+/// Invalid escapes are left as they are rather than being an error — a fragment
+/// this crate cannot decode is one it will simply fail to resolve, which is
+/// already the reported outcome.
+///
+/// ```
+/// # use ash_jsonschema_builder::uri::decode_fragment;
+/// assert_eq!(decode_fragment("/$defs/percent%25field"), "/$defs/percent%field");
+/// assert_eq!(decode_fragment("/$defs/foo%22bar"), r#"/$defs/foo"bar"#);
+/// assert_eq!(decode_fragment("/$defs/plain"), "/$defs/plain");
+/// ```
+pub fn decode_fragment(fragment: &str) -> String {
+    if !fragment.contains('%') {
+        return fragment.to_owned();
+    }
+
+    let bytes = fragment.as_bytes();
+    let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%'
+            && index + 2 < bytes.len()
+            && let (Some(high), Some(low)) = (
+                (bytes[index + 1] as char).to_digit(16),
+                (bytes[index + 2] as char).to_digit(16),
+            )
+        {
+            out.push((high * 16 + low) as u8);
+            index += 3;
+            continue;
+        }
+        out.push(bytes[index]);
+        index += 1;
+    }
+
+    String::from_utf8(out).unwrap_or_else(|_| fragment.to_owned())
+}
+
 /// Strips any fragment from a URI, leaving the resource it identifies.
 ///
 /// ```
@@ -188,6 +232,19 @@ mod tests {
         assert!(is_pointer_fragment("/$defs/A"));
         assert!(!is_pointer_fragment("anchor"));
         assert!(!is_pointer_fragment("a.b-c_d"));
+    }
+
+    #[test]
+    fn percent_escapes_in_a_fragment_are_decoded() {
+        assert_eq!(decode_fragment("/$defs/percent%25field"), "/$defs/percent%field");
+        assert_eq!(decode_fragment("/$defs/foo%22bar"), "/$defs/foo\"bar");
+        assert_eq!(decode_fragment("/a%2Fb"), "/a/b");
+        // Nothing to do, and nothing broken by trying.
+        assert_eq!(decode_fragment("/$defs/plain"), "/$defs/plain");
+        assert_eq!(decode_fragment(""), "");
+        // A malformed escape is left alone rather than erroring.
+        assert_eq!(decode_fragment("/a%zz"), "/a%zz");
+        assert_eq!(decode_fragment("/a%"), "/a%");
     }
 
     #[test]
