@@ -9,7 +9,7 @@
 //! backed by a `Vec`, so lookup is linear — irrelevant at the handful-of-keys
 //! scale a schema object works at, and it costs the crate no extra dependency.
 
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A string-keyed map that preserves insertion order.
 ///
@@ -116,6 +116,36 @@ impl<T> IntoIterator for OrderedMap<T> {
 impl<T: Serialize> Serialize for OrderedMap<T> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_map(self.entries.iter().map(|(k, v)| (k, v)))
+    }
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for OrderedMap<T> {
+    /// Reads a JSON object, keeping the order its keys appeared in the source
+    /// text — so a schema parsed from a file and rendered back out keeps its
+    /// `properties` in the author's order rather than reshuffling them.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor<T>(std::marker::PhantomData<T>);
+
+        impl<'de, T: Deserialize<'de>> serde::de::Visitor<'de> for Visitor<T> {
+            type Value = OrderedMap<T>;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a JSON object")
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                mut access: A,
+            ) -> Result<Self::Value, A::Error> {
+                let mut map = OrderedMap::new();
+                while let Some((key, value)) = access.next_entry::<String, T>()? {
+                    map.insert(key, value);
+                }
+                Ok(map)
+            }
+        }
+
+        deserializer.deserialize_map(Visitor(std::marker::PhantomData))
     }
 }
 

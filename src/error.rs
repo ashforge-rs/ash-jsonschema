@@ -31,13 +31,40 @@ impl fmt::Display for Violation {
     }
 }
 
-/// A built schema that the 2020-12 meta-schema rejected.
+/// One or more ways a schema failed a check.
 ///
 /// Always holds at least one [`Violation`], in the order the walk found them:
 /// outermost keyword first, then down through the subschemas.
+///
+/// Two checks report through this type, and they say different things, so the
+/// error carries which one ran: [`Builder::build`](crate::Builder::build)
+/// checks a document's *shape* against the meta-schema, while
+/// [`Registry::check_references`](crate::Registry::check_references) checks
+/// that its `$ref`s land somewhere. A dangling reference is a perfectly valid
+/// 2020-12 document, so it must not be reported as a malformed one.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SchemaError {
     violations: Vec<Violation>,
+    kind: ErrorKind,
+}
+
+/// Which check produced a [`SchemaError`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ErrorKind {
+    /// The document is not a well-formed JSON Schema 2020-12.
+    MetaSchema,
+    /// The document is well-formed, but a reference in it resolves to nothing.
+    References,
+}
+
+impl ErrorKind {
+    /// The headline this kind of failure is reported under.
+    fn headline(&self) -> &'static str {
+        match self {
+            Self::MetaSchema => "the built schema is not valid JSON Schema 2020-12",
+            Self::References => "the schema has references that resolve to nothing",
+        }
+    }
 }
 
 impl SchemaError {
@@ -47,11 +74,25 @@ impl SchemaError {
     ///
     /// If `violations` is empty — an error with nothing wrong is a bug.
     pub(crate) fn new(violations: Vec<Violation>) -> Self {
+        Self::of_kind(violations, ErrorKind::MetaSchema)
+    }
+
+    /// Wraps a non-empty list of violations from a named check.
+    ///
+    /// # Panics
+    ///
+    /// If `violations` is empty — an error with nothing wrong is a bug.
+    pub(crate) fn of_kind(violations: Vec<Violation>, kind: ErrorKind) -> Self {
         assert!(
             !violations.is_empty(),
             "a SchemaError must carry at least one violation"
         );
-        Self { violations }
+        Self { violations, kind }
+    }
+
+    /// Which check reported this.
+    pub fn kind(&self) -> ErrorKind {
+        self.kind
     }
 
     /// Every violation found, in walk order.
@@ -73,10 +114,7 @@ impl fmt::Display for SchemaError {
         } else {
             "violations"
         };
-        write!(
-            f,
-            "the built schema is not valid JSON Schema 2020-12 ({count} {plural})"
-        )?;
+        write!(f, "{} ({count} {plural})", self.kind.headline())?;
         for violation in &self.violations {
             write!(f, "\n  - {violation}")?;
         }
@@ -85,6 +123,50 @@ impl fmt::Display for SchemaError {
 }
 
 impl std::error::Error for SchemaError {}
+
+/// What [`Schema::parse_checked`](crate::Schema::parse_checked) reports.
+///
+/// The two cases are kept apart because they mean different things to a
+/// caller: [`Syntax`](ParseError::Syntax) says the text was not JSON, while
+/// [`Invalid`](ParseError::Invalid) says it parsed cleanly and then failed the
+/// meta-schema.
+#[derive(Debug)]
+pub enum ParseError {
+    /// The text was not well-formed JSON.
+    Syntax(serde_json::Error),
+    /// The document parsed but is not a valid JSON Schema 2020-12.
+    Invalid(SchemaError),
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Syntax(error) => write!(f, "the schema is not well-formed JSON: {error}"),
+            Self::Invalid(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for ParseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Syntax(error) => Some(error),
+            Self::Invalid(error) => Some(error),
+        }
+    }
+}
+
+impl From<serde_json::Error> for ParseError {
+    fn from(value: serde_json::Error) -> Self {
+        Self::Syntax(value)
+    }
+}
+
+impl From<SchemaError> for ParseError {
+    fn from(value: SchemaError) -> Self {
+        Self::Invalid(value)
+    }
+}
 
 #[cfg(test)]
 mod tests {

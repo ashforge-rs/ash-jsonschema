@@ -250,8 +250,9 @@ fn index_anchors(
     }
 }
 
-/// Escapes a JSON Pointer reference token (RFC 6901 §3).
-pub(crate) fn escape_pointer_token(token: &str) -> String {
+/// Escapes a JSON Pointer reference token (RFC 6901 §3): `~` becomes `~0` and
+/// `/` becomes `~1`, so a property name can sit inside a pointer.
+pub fn escape_pointer_token(token: &str) -> String {
     token.replace('~', "~0").replace('/', "~1")
 }
 
@@ -260,8 +261,22 @@ fn unescape_pointer_token(token: &str) -> String {
     token.replace("~1", "/").replace("~0", "~")
 }
 
-/// Resolves a JSON Pointer against `document`.
-pub(crate) fn resolve_pointer<'a>(document: &'a Value, pointer: &str) -> Option<&'a Value> {
+/// Resolves a JSON Pointer against `document`, RFC 6901.
+///
+/// The empty pointer is the document itself. Returns `None` if any token names
+/// something absent, or if a token indexes into a scalar.
+///
+/// ```
+/// # use ash_jsonschema_builder::meta::resolve_pointer;
+/// let document = serde_json::json!({"properties": {"id": {"type": "string"}}});
+///
+/// assert_eq!(
+///     resolve_pointer(&document, "/properties/id/type"),
+///     Some(&serde_json::json!("string")),
+/// );
+/// assert_eq!(resolve_pointer(&document, "/nope"), None);
+/// ```
+pub fn resolve_pointer<'a>(document: &'a Value, pointer: &str) -> Option<&'a Value> {
     if pointer.is_empty() {
         return Some(document);
     }

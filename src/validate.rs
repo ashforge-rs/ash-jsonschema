@@ -140,7 +140,7 @@ impl<'m> Validator<'m> {
         let entered;
         let scope = match map.get("$id").and_then(Value::as_str) {
             Some(id) if id != scope.base => {
-                let (base, _) = resolve_uri(&scope.base, id);
+                let (base, _) = crate::uri::resolve(&scope.base, id);
                 let mut dynamic = scope.dynamic.clone();
                 dynamic.push(base.clone());
                 entered = Scope { base, dynamic };
@@ -212,7 +212,7 @@ impl<'m> Validator<'m> {
 
     /// Splits a `$ref` into the resource it names and the pointer within it.
     fn resolve_reference(&self, base: &str, target: &str, rule: &str) -> (String, String) {
-        let (resource, fragment) = resolve_uri(base, target);
+        let (resource, fragment) = crate::uri::resolve(base, target);
         let pointer = self.fragment_to_pointer(&resource, &fragment, rule, false);
         (resource, pointer)
     }
@@ -222,7 +222,7 @@ impl<'m> Validator<'m> {
     /// — which is what lets the meta-schema hand subschema validation back to
     /// whichever dialect started the evaluation.
     fn resolve_dynamic(&self, scope: &Scope, target: &str, rule: &str) -> (String, String) {
-        let (resource, fragment) = resolve_uri(&scope.base, target);
+        let (resource, fragment) = crate::uri::resolve(&scope.base, target);
         let is_plain_name = !fragment.is_empty() && !fragment.starts_with('/');
 
         if is_plain_name && self.meta.dynamic_anchor(&resource, &fragment).is_some() {
@@ -821,67 +821,6 @@ fn brief(values: &[Value]) -> String {
     }
 }
 
-/// Resolves a URI reference against a base, RFC 3986 §5.3, returning the target
-/// resource and its fragment (without the `#`).
-///
-/// Only what the meta-schema needs: the vendored documents reference each other
-/// by relative path (`meta/core`) and themselves by fragment (`#/$defs/…`,
-/// `#meta`).
-fn resolve_uri(base: &str, reference: &str) -> (String, String) {
-    let (target, fragment) = match reference.split_once('#') {
-        Some((target, fragment)) => (target, fragment),
-        None => (reference, ""),
-    };
-    let base_resource = base.split_once('#').map_or(base, |(resource, _)| resource);
-
-    let resource = if target.is_empty() {
-        base_resource.to_owned()
-    } else if target.contains("://") {
-        target.to_owned()
-    } else if let Some(rest) = target.strip_prefix('/') {
-        // An absolute path replaces the base's whole path.
-        match base_resource.split_once("://") {
-            Some((scheme, rest_of_base)) => {
-                let authority = rest_of_base.split('/').next().unwrap_or("");
-                format!("{scheme}://{authority}/{rest}")
-            }
-            None => target.to_owned(),
-        }
-    } else {
-        // A relative path replaces the base's last segment.
-        let directory = match base_resource.rfind('/') {
-            Some(index) => &base_resource[..=index],
-            None => "",
-        };
-        remove_dot_segments(&format!("{directory}{target}"))
-    };
-
-    (resource, fragment.to_owned())
-}
-
-/// Collapses `.` and `..` segments in a path, RFC 3986 §5.2.4.
-fn remove_dot_segments(uri: &str) -> String {
-    let (prefix, path) = match uri.split_once("://") {
-        Some((scheme, rest)) => match rest.split_once('/') {
-            Some((authority, path)) => (format!("{scheme}://{authority}/"), path),
-            None => return uri.to_owned(),
-        },
-        None => (String::new(), uri),
-    };
-
-    let mut segments: Vec<&str> = Vec::new();
-    for segment in path.split('/') {
-        match segment {
-            "." => {}
-            ".." => {
-                segments.pop();
-            }
-            other => segments.push(other),
-        }
-    }
-    format!("{prefix}{}", segments.join("/"))
-}
-
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -1010,45 +949,7 @@ mod tests {
         );
     }
 
-    #[test]
-    fn relative_references_resolve_against_the_base() {
-        let base = "https://json-schema.org/draft/2020-12/schema";
-        assert_eq!(
-            resolve_uri(base, "meta/core"),
-            (
-                "https://json-schema.org/draft/2020-12/meta/core".to_owned(),
-                String::new()
-            ),
-        );
-        assert_eq!(
-            resolve_uri(base, "#/$defs/anchorString"),
-            (base.to_owned(), "/$defs/anchorString".to_owned()),
-        );
-        assert_eq!(
-            resolve_uri(base, "#meta"),
-            (base.to_owned(), "meta".to_owned())
-        );
-        assert_eq!(
-            resolve_uri(base, "https://example.com/other#x"),
-            ("https://example.com/other".to_owned(), "x".to_owned()),
-        );
-        assert_eq!(
-            resolve_uri(base, "/absolute"),
-            ("https://json-schema.org/absolute".to_owned(), String::new()),
-        );
-    }
 
-    #[test]
-    fn dot_segments_collapse() {
-        assert_eq!(
-            remove_dot_segments("https://a.example/b/./c/../d"),
-            "https://a.example/b/d",
-        );
-        assert_eq!(
-            remove_dot_segments("https://a.example/b"),
-            "https://a.example/b"
-        );
-    }
 
     #[test]
     fn json_equality_compares_numbers_by_value() {

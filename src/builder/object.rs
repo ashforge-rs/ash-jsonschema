@@ -51,6 +51,70 @@ impl Builder<kind::Object> {
         self.property(name.clone(), schema).required([name])
     }
 
+    /// Adds several entries to `properties`, marking every one required.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let schema = Schema::object()
+    ///     .required_properties([("id", Schema::string()), ("email", Schema::string())])
+    ///     .build()?;
+    ///
+    /// assert_eq!(schema.as_object().unwrap().required.as_ref().unwrap(), &["id", "email"]);
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn required_properties<N, S>(self, properties: impl IntoIterator<Item = (N, S)>) -> Self
+    where
+        N: Into<String>,
+        S: Into<Schema>,
+    {
+        properties.into_iter().fold(self, |builder, (name, schema)| {
+            builder.required_property(name, schema)
+        })
+    }
+
+    /// Adds one entry to `properties` and marks it required when `required` is
+    /// true — for a field whose optionality is decided at run time.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// # let mandatory = false;
+    /// let schema = Schema::object()
+    ///     .property_maybe_required("nickname", Schema::string(), mandatory)
+    ///     .build()?;
+    ///
+    /// assert_eq!(schema.as_object().unwrap().required, None);
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn property_maybe_required(
+        self,
+        name: impl Into<String>,
+        schema: impl Into<Schema>,
+        required: bool,
+    ) -> Self {
+        if required {
+            self.required_property(name, schema)
+        } else {
+            self.property(name, schema)
+        }
+    }
+
+    /// Closes the object: `additionalProperties: false`.
+    ///
+    /// Shorthand for the call spelled out, which is what most schemas that
+    /// close an object mean.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// assert_eq!(
+    ///     Schema::object().closed().build()?.to_json(),
+    ///     r#"{"type":"object","additionalProperties":false}"#,
+    /// );
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn closed(self) -> Self {
+        self.additional_properties(false)
+    }
+
     /// Appends names to `required`, skipping any already listed.
     pub fn required(mut self, names: impl IntoIterator<Item = impl Into<String>>) -> Self {
         let target = self.inner.required.get_or_insert_with(Vec::new);

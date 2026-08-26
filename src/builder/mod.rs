@@ -172,10 +172,77 @@ impl<K> Builder<K> {
         Schema::Object(Box::new(self.inner))
     }
 
+    /// Returns an owned copy of the schema built so far, leaving the chain
+    /// intact.
+    ///
+    /// Builders are consuming — every keyword method takes `self` — so reading
+    /// what one holds partway through normally means ending it. This takes a
+    /// copy instead, for a base that several schemas branch from:
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let base = Schema::object()
+    ///     .required_property("id", Schema::string())
+    ///     .description("Every record carries an id.");
+    ///
+    /// // A copy of the common part, and the chain carries on regardless.
+    /// let common = base.export();
+    /// let full = base.required_property("name", Schema::string()).build()?;
+    ///
+    /// assert!(common.requires("id"));
+    /// assert!(!common.requires("name"));
+    /// assert!(full.requires("name"));
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    ///
+    /// The copy is not checked against the meta-schema — a chain in progress is
+    /// not expected to be finished. Call [`Schema::validate`] if that matters.
+    pub fn export(&self) -> Schema {
+        Schema::Object(Box::new(self.inner.clone()))
+    }
+
     /// Finishes the chain and produces the bare keyword bag, for callers who
     /// want to keep editing it by hand.
     pub fn into_object(self) -> SchemaObject {
         self.inner
+    }
+
+    /// Sets a keyword this crate does not model, under the name given.
+    ///
+    /// The 2020-12 dialect is a closed set and the typed methods cover it, so
+    /// this is for what lies outside: an extension vocabulary's keyword, an
+    /// `x-`-prefixed annotation, a private validator's own attribute. The
+    /// value is written verbatim and rendered after every dialect keyword.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let schema = Schema::object()
+    ///     .property("kind", Schema::string())
+    ///     .keyword("discriminator", serde_json::json!({"propertyName": "kind"}))
+    ///     .build()?;
+    ///
+    /// assert!(schema.to_json().contains(r#""discriminator":{"propertyName":"kind"}"#));
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// If `name` is a keyword the dialect defines. Writing one here as well as
+    /// into its typed field would render it twice in the same object, and a
+    /// document with a duplicate key is not something this crate will emit —
+    /// so `.keyword("minLength", 1)` is a mistake caught loudly rather than a
+    /// schema that means whichever of the two a parser happened to keep. Use
+    /// the typed method; [`is_dialect_keyword`](crate::schema::is_dialect_keyword)
+    /// tells the two apart if you are dispatching on a name at run time.
+    pub fn keyword(mut self, name: impl Into<String>, value: impl Into<Value>) -> Self {
+        let name = name.into();
+        assert!(
+            !crate::schema::is_dialect_keyword(&name),
+            "`{name}` is a keyword of the 2020-12 dialect and has a typed builder method; \
+             writing it through `keyword` would render it twice",
+        );
+        self.inner.extensions.insert(name, value.into());
+        self
     }
 
     // --- core vocabulary --------------------------------------------------
@@ -444,6 +511,98 @@ impl<K> Builder<K> {
     }
 }
 
+/// Resuming a chain on a schema that already exists.
+///
+/// The typed entry points on [`Schema`] start from nothing, which is right for
+/// a schema being written for the first time and wrong for one that arrived
+/// from somewhere else — parsed from a file, thawed out of a
+/// [`FrozenSchema`], or handed over by another crate.
+/// These pick such a schema back up.
+impl SchemaObject {
+    /// Resumes building from this keyword bag, with no committed type marker.
+    ///
+    /// Every general keyword is reachable on the result. The type-specific
+    /// vocabularies are not, because a bag of keywords carries no compile-time
+    /// evidence of which one applies — use [`into_typed`](Self::into_typed)
+    /// when you know.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let parsed = Schema::parse(r#"{"type":"string","minLength":1}"#).unwrap();
+    /// let object = parsed.as_object().unwrap().clone();
+    ///
+    /// let extended = object.into_builder().title("Name").build()?;
+    /// assert_eq!(extended.to_json(), r#"{"title":"Name","type":"string","minLength":1}"#);
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn into_builder(self) -> AnyBuilder {
+        Builder {
+            inner: self,
+            kind: PhantomData,
+        }
+    }
+
+    /// Resumes building from this keyword bag under a type marker you choose.
+    ///
+    /// This asserts the shape rather than checking it: nothing here confirms
+    /// that `type` actually says `string` before handing back a
+    /// [`StringBuilder`], so a mismatch produces a schema whose keywords a
+    /// validator will ignore rather than a compile error.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::{Schema, StringBuilder};
+    /// let parsed = Schema::parse(r#"{"type":"string"}"#).unwrap();
+    /// let object = parsed.as_object().unwrap().clone();
+    ///
+    /// let tightened: StringBuilder = object.into_typed();
+    /// assert_eq!(
+    ///     tightened.max_length(64).build()?.to_json(),
+    ///     r#"{"type":"string","maxLength":64}"#,
+    /// );
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn into_typed<K>(self) -> Builder<K> {
+        Builder {
+            inner: self,
+            kind: PhantomData,
+        }
+    }
+}
+
+impl Schema {
+    /// Resumes building from this schema.
+    ///
+    /// The boolean schemas `true` and `false` carry no keywords, so they resume
+    /// as an empty builder — the boolean-ness is not preserved.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let base = Schema::parse(r#"{"type":"object","properties":{"id":{"type":"string"}}}"#)
+    ///     .unwrap();
+    ///
+    /// let described = base.into_builder().description("A record").build()?;
+    /// assert!(described.to_json().contains(r#""description":"A record""#));
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn into_builder(self) -> AnyBuilder {
+        self.into_schema_object().into_builder()
+    }
+
+    /// Resumes building from this schema under a type marker you choose. See
+    /// [`SchemaObject::into_typed`] for the caveat.
+    pub fn into_typed<K>(self) -> Builder<K> {
+        self.into_schema_object().into_typed()
+    }
+
+    /// The keyword bag, taken by value. A boolean schema yields an empty one.
+    pub fn into_schema_object(self) -> SchemaObject {
+        match self {
+            Schema::Object(object) => *object,
+            Schema::Bool(_) => SchemaObject::new(),
+        }
+    }
+}
+
 impl<K> From<Builder<K>> for Schema {
     /// Unchecked, deliberately: the root `.build()` validates the whole tree,
     /// so a subschema is checked exactly once, in place.
@@ -587,6 +746,27 @@ mod tests {
             Schema::builder().not(false).build().unwrap().to_json(),
             r#"{"not":false}"#
         );
+    }
+
+    #[test]
+    fn an_extension_keyword_renders_after_the_dialect_ones() {
+        let schema = Schema::string()
+            .title("Name")
+            .keyword("x-owner", "platform")
+            .keyword("x-since", 3)
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            schema.to_json(),
+            r#"{"title":"Name","type":"string","x-owner":"platform","x-since":3}"#,
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "has a typed builder method")]
+    fn an_extension_may_not_shadow_a_dialect_keyword() {
+        let _ = Schema::string().keyword("minLength", 1);
     }
 
     #[test]

@@ -11,7 +11,7 @@
 
 use std::fmt;
 
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// A `format` attribute.
 ///
@@ -144,6 +144,15 @@ impl fmt::Display for Format {
 impl Serialize for Format {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Format {
+    /// Reads the attribute back through [`From<&str>`](Format::from), so a name
+    /// the specification defines round-trips to its own variant and anything
+    /// else lands in [`Format::Custom`].
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Self::from(String::deserialize(deserializer)?))
     }
 }
 

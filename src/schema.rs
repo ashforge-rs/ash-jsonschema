@@ -6,7 +6,7 @@
 //! Everything is public so a caller who needs a keyword combination the
 //! builders do not expose can assemble a [`SchemaObject`] by hand.
 
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value;
 
 use crate::builder::{
@@ -34,7 +34,7 @@ pub const DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
 /// assert_eq!(serde_json::to_string(&Num::from(3)).unwrap(), "3");
 /// assert_eq!(serde_json::to_string(&Num::from(2.5)).unwrap(), "2.5");
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct Num(serde_json::Number);
 
 impl Num {
@@ -102,7 +102,7 @@ impl Serialize for Num {
 // ---------------------------------------------------------------------------
 
 /// One of the seven values the `type` keyword accepts.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum SchemaType {
     /// `null`.
@@ -136,9 +136,75 @@ impl SchemaType {
     }
 }
 
+impl SchemaType {
+    /// The seven type names, in the order the specification lists them.
+    pub const NAMES: [&'static str; 7] = [
+        "null", "boolean", "object", "array", "number", "integer", "string",
+    ];
+
+    /// The type a name denotes, or `None` if it denotes none of them.
+    ///
+    /// The names are exactly as the specification writes them, so the match is
+    /// case-sensitive. [`FromStr`](std::str::FromStr) is implemented too, for
+    /// when a `Result` suits the caller better than an `Option`.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::SchemaType;
+    /// assert_eq!(SchemaType::parse("integer"), Some(SchemaType::Integer));
+    /// assert_eq!(SchemaType::parse("Integer"), None);
+    ///
+    /// let parsed: SchemaType = "string".parse().unwrap();
+    /// assert_eq!(parsed, SchemaType::String);
+    /// ```
+    pub fn parse(name: &str) -> Option<Self> {
+        match name {
+            "null" => Some(Self::Null),
+            "boolean" => Some(Self::Boolean),
+            "object" => Some(Self::Object),
+            "array" => Some(Self::Array),
+            "number" => Some(Self::Number),
+            "integer" => Some(Self::Integer),
+            "string" => Some(Self::String),
+            _ => None,
+        }
+    }
+}
+
 impl std::fmt::Display for SchemaType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+/// A name that denotes none of the seven types the `type` keyword accepts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnknownSchemaType(String);
+
+impl UnknownSchemaType {
+    /// The name that was not recognised.
+    pub fn name(&self) -> &str {
+        &self.0
+    }
+}
+
+impl std::fmt::Display for UnknownSchemaType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "`{}` is not a JSON Schema type; expected one of {}",
+            self.0,
+            SchemaType::NAMES.join(", "),
+        )
+    }
+}
+
+impl std::error::Error for UnknownSchemaType {}
+
+impl std::str::FromStr for SchemaType {
+    type Err = UnknownSchemaType;
+
+    fn from_str(name: &str) -> Result<Self, Self::Err> {
+        Self::parse(name).ok_or_else(|| UnknownSchemaType(name.to_owned()))
     }
 }
 
@@ -178,6 +244,47 @@ impl TypeSet {
     }
 }
 
+impl<'de> Deserialize<'de> for TypeSet {
+    /// Reads either the bare form or the array form, naming the seven legal
+    /// types when it reads neither — the derived `untagged` reader would only
+    /// say that no variant matched.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct TypeSetVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for TypeSetVisitor {
+            type Value = TypeSet;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str(
+                    "a type name (\"null\", \"boolean\", \"object\", \"array\", \"number\",                      \"integer\", \"string\") or an array of them",
+                )
+            }
+
+            fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<TypeSet, E> {
+                SchemaType::parse(value)
+                    .map(TypeSet::One)
+                    .ok_or_else(|| E::unknown_variant(value, &SchemaType::NAMES))
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut access: A,
+            ) -> Result<TypeSet, A::Error> {
+                let mut types = Vec::new();
+                while let Some(name) = access.next_element::<String>()? {
+                    let ty = SchemaType::parse(&name).ok_or_else(|| {
+                        serde::de::Error::unknown_variant(&name, &SchemaType::NAMES)
+                    })?;
+                    types.push(ty);
+                }
+                Ok(TypeSet::Many(types))
+            }
+        }
+
+        deserializer.deserialize_any(TypeSetVisitor)
+    }
+}
+
 impl From<SchemaType> for TypeSet {
     fn from(value: SchemaType) -> Self {
         Self::One(value)
@@ -199,6 +306,84 @@ impl FromIterator<SchemaType> for TypeSet {
     }
 }
 
+/// Every keyword name the 2020-12 dialect defines, as it is written in a
+/// document.
+///
+/// A name in this list has a typed field on [`SchemaObject`]; a name outside it
+/// belongs in [`SchemaObject::extensions`]. The two are kept apart so a
+/// keyword can never be written twice into one rendered object.
+pub const DIALECT_KEYWORDS: [&str; 57] = [
+    "$schema",
+    "$id",
+    "$anchor",
+    "$dynamicAnchor",
+    "$ref",
+    "$dynamicRef",
+    "$vocabulary",
+    "$comment",
+    "title",
+    "description",
+    "type",
+    "enum",
+    "const",
+    "multipleOf",
+    "maximum",
+    "exclusiveMaximum",
+    "minimum",
+    "exclusiveMinimum",
+    "maxLength",
+    "minLength",
+    "pattern",
+    "format",
+    "prefixItems",
+    "items",
+    "contains",
+    "maxContains",
+    "minContains",
+    "maxItems",
+    "minItems",
+    "uniqueItems",
+    "unevaluatedItems",
+    "properties",
+    "required",
+    "patternProperties",
+    "additionalProperties",
+    "propertyNames",
+    "maxProperties",
+    "minProperties",
+    "dependentRequired",
+    "dependentSchemas",
+    "unevaluatedProperties",
+    "allOf",
+    "anyOf",
+    "oneOf",
+    "not",
+    "if",
+    "then",
+    "else",
+    "contentEncoding",
+    "contentMediaType",
+    "contentSchema",
+    "default",
+    "examples",
+    "deprecated",
+    "readOnly",
+    "writeOnly",
+    "$defs",
+];
+
+/// Whether `name` is a keyword the 2020-12 dialect defines, and so has a typed
+/// field rather than belonging in [`SchemaObject::extensions`].
+///
+/// ```
+/// # use ash_jsonschema_builder::schema::is_dialect_keyword;
+/// assert!(is_dialect_keyword("minLength"));
+/// assert!(!is_dialect_keyword("x-internal"));
+/// ```
+pub fn is_dialect_keyword(name: &str) -> bool {
+    DIALECT_KEYWORDS.contains(&name)
+}
+
 // ---------------------------------------------------------------------------
 // The keyword bag
 // ---------------------------------------------------------------------------
@@ -213,7 +398,8 @@ impl FromIterator<SchemaType> for TypeSet {
 /// Field order is output order, chosen to read the way a hand-written schema
 /// does: identity, then labels, then `type` and the assertions it governs, then
 /// the applicators, then the annotations, with `$defs` last.
-#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SchemaObject {
     // --- core vocabulary -------------------------------------------------
     /// `$schema` — the dialect this document is written in.
@@ -415,6 +601,21 @@ pub struct SchemaObject {
     /// `$defs` — reusable subschemas, referenced by `$ref`.
     #[serde(rename = "$defs", skip_serializing_if = "Option::is_none")]
     pub defs: Option<OrderedMap<Schema>>,
+
+    // --- everything else --------------------------------------------------
+    /// Keywords outside the 2020-12 dialect, kept verbatim.
+    ///
+    /// JSON Schema requires an implementation to ignore keywords it does not
+    /// recognise rather than reject them, which is what makes extension
+    /// vocabularies — OpenAPI's `discriminator`, an `x-`-prefixed annotation,
+    /// a private validator's own attribute — legal in a schema document. They
+    /// are collected here so parsing a document and rendering it back out
+    /// does not quietly discard them.
+    ///
+    /// These render last, after every dialect keyword, each under the name it
+    /// was written with.
+    #[serde(flatten)]
+    pub extensions: OrderedMap<Value>,
 }
 
 impl SchemaObject {
@@ -559,10 +760,64 @@ impl Schema {
         Schema::Bool(false)
     }
 
+    // --- parsing ----------------------------------------------------------
+
+    /// Parses a schema from JSON text.
+    ///
+    /// This reads the document; it does not check that it *is* a schema — call
+    /// [`validate`](Self::validate) for that, or use
+    /// [`parse_checked`](Self::parse_checked) to do both at once. Keywords
+    /// outside the 2020-12 dialect are kept in
+    /// [`SchemaObject::extensions`] rather than discarded, so a document
+    /// parsed and rendered back out keeps everything it arrived with.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let schema = Schema::parse(r#"{"type":"string","minLength":1}"#)?;
+    /// assert_eq!(schema.as_object().unwrap().min_length, Some(1));
+    /// # Ok::<(), serde_json::Error>(())
+    /// ```
+    pub fn parse(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Parses a schema from JSON text and checks it against the meta-schema.
+    ///
+    /// The two failure modes stay distinct: [`ParseError::Syntax`](crate::ParseError::Syntax) means the
+    /// text was not JSON at all, [`ParseError::Invalid`](crate::ParseError::Invalid) means it parsed but is
+    /// not a well-formed 2020-12 schema.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let schema = Schema::parse_checked(r#"{"type":"string"}"#).unwrap();
+    /// assert!(schema.as_object().is_some());
+    ///
+    /// let bad = Schema::parse_checked(r#"{"$anchor":"not an anchor"}"#).unwrap_err();
+    /// assert!(bad.to_string().contains("$anchor"));
+    /// ```
+    pub fn parse_checked(json: &str) -> Result<Self, crate::error::ParseError> {
+        let schema = Self::parse(json)?;
+        schema.validate()?;
+        Ok(schema)
+    }
+
+    /// Reads a schema out of an already-parsed [`serde_json::Value`].
+    pub fn from_value(value: Value) -> Result<Self, serde_json::Error> {
+        serde_json::from_value(value)
+    }
+
     // --- inspection -------------------------------------------------------
 
     /// The keyword bag, for the object form.
     pub fn as_object(&self) -> Option<&SchemaObject> {
+        match self {
+            Self::Object(object) => Some(object),
+            Self::Bool(_) => None,
+        }
+    }
+
+    /// The keyword bag, mutably, for the object form.
+    pub fn as_object_mut(&mut self) -> Option<&mut SchemaObject> {
         match self {
             Self::Object(object) => Some(object),
             Self::Bool(_) => None,
@@ -575,6 +830,63 @@ impl Schema {
             Self::Bool(value) => Some(*value),
             Self::Object(_) => None,
         }
+    }
+
+    /// The permitted instance type(s), if `type` is set.
+    pub fn schema_type(&self) -> Option<&TypeSet> {
+        self.as_object().and_then(|object| object.types.as_ref())
+    }
+
+    /// The subschema under `properties` for `name`, if any.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let schema = Schema::object().property("id", Schema::string()).build()?;
+    /// assert_eq!(schema.property("id").and_then(Schema::as_bool), None);
+    /// assert!(schema.property("id").is_some());
+    /// assert!(schema.property("missing").is_none());
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn property(&self, name: &str) -> Option<&Schema> {
+        self.as_object()?.properties.as_ref()?.get(name)
+    }
+
+    /// Whether `name` is listed in `required`.
+    pub fn requires(&self, name: &str) -> bool {
+        self.as_object()
+            .and_then(|object| object.required.as_ref())
+            .is_some_and(|required| required.iter().any(|entry| entry == name))
+    }
+
+    /// The subschema under `$defs` for `name`, if any.
+    pub fn def(&self, name: &str) -> Option<&Schema> {
+        self.as_object()?.defs.as_ref()?.get(name)
+    }
+
+    /// Resolves a JSON Pointer against this schema, as
+    /// [`Violation::location`](crate::Violation::location) reports one.
+    ///
+    /// The empty pointer is the root. This resolves against the *rendered*
+    /// document, so it reaches every keyword under the name it is written with,
+    /// including the ones inside [`extensions`](SchemaObject::extensions).
+    ///
+    /// The value is cloned out of a rendering of this schema, so resolving many
+    /// pointers over one schema is better served by holding a
+    /// [`to_value`](Self::to_value) once and using
+    /// [`serde_json::Value::pointer`] on it.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let schema = Schema::object()
+    ///     .property("id", Schema::string().min_length(1))
+    ///     .build()?;
+    ///
+    /// assert_eq!(schema.pointer("/properties/id/minLength"), Some(serde_json::json!(1)));
+    /// assert_eq!(schema.pointer("/properties/nope"), None);
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn pointer(&self, pointer: &str) -> Option<Value> {
+        self.to_value().pointer(pointer).cloned()
     }
 
     // --- validation -------------------------------------------------------
@@ -593,6 +905,70 @@ impl Schema {
     /// ```
     pub fn validate(&self) -> Result<(), crate::error::SchemaError> {
         crate::validate::validate_document(&self.to_value())
+    }
+
+    /// Returns an owned copy of this schema.
+    ///
+    /// The copy is detached: editing it leaves this one untouched, and vice
+    /// versa. This is what [`Clone`] does, named for the intent — it is the
+    /// same call whether you hold a [`Schema`], a
+    /// [`FrozenSchema`](crate::FrozenSchema), or a builder, so a caller that
+    /// wants a copy out need not know which it has.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let schema = Schema::object().title("Original").build()?;
+    ///
+    /// let mut copy = schema.export();
+    /// copy.as_object_mut().unwrap().title = Some("Mine".into());
+    ///
+    /// assert_eq!(copy.as_object().unwrap().title.as_deref(), Some("Mine"));
+    /// assert_eq!(schema.as_object().unwrap().title.as_deref(), Some("Original"));
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn export(&self) -> Schema {
+        self.clone()
+    }
+
+    /// Returns an owned copy of the subschema at `pointer`.
+    ///
+    /// The pointer is the one [`pointer`](Self::pointer) takes and a
+    /// [`Violation`](crate::Violation) reports — the empty string is the root.
+    /// Unlike `pointer`, what comes back is a [`Schema`] rather than a bare
+    /// [`Value`], so a subtree can be lifted out and used as a schema in its
+    /// own right.
+    ///
+    /// Returns `None` if the pointer names nothing, or names a place that is
+    /// not a schema — `/properties` is a map of subschemas, not one itself.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let schema = Schema::object()
+    ///     .property("address", Schema::object().required(["city"]))
+    ///     .build()?;
+    ///
+    /// let address = schema.export_at("/properties/address").unwrap();
+    /// assert_eq!(address.to_json(), r#"{"type":"object","required":["city"]}"#);
+    ///
+    /// assert!(schema.export_at("/properties/missing").is_none());
+    /// assert!(schema.export_at("/properties").is_none());  // a map, not a schema
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn export_at(&self, pointer: &str) -> Option<Schema> {
+        if pointer.is_empty() {
+            return Some(self.export());
+        }
+        // Walking to the subschema keeps this honest about what counts as one:
+        // a pointer into `properties` itself lands on a map of schemas, which
+        // is not a schema, and the walk never visits it.
+        let document = self.to_value();
+        let mut found = None;
+        crate::walk::walk_subschemas(&document, |at, node| {
+            if at == pointer {
+                found = Some(node.clone());
+            }
+        });
+        Schema::from_value(found?).ok()
     }
 
     /// Freezes this schema so it can never be modified again.
@@ -625,6 +1001,44 @@ impl Schema {
     /// Renders the schema as indented JSON.
     pub fn to_json_pretty(&self) -> String {
         serde_json::to_string_pretty(self).expect("a schema is always representable as JSON")
+    }
+}
+
+impl<'de> Deserialize<'de> for Schema {
+    /// Reads either schema form, keeping the reason a bad document was
+    /// rejected.
+    ///
+    /// The derived `untagged` reader would try each variant and, on failing
+    /// both, report only that nothing matched — losing the actual mistake and
+    /// its position. Dispatching on the token instead means a boolean is read
+    /// as a boolean, anything else is read as a keyword bag, and the error
+    /// that comes back is the one serde raised for the offending keyword.
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct SchemaVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for SchemaVisitor {
+            type Value = Schema;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("a JSON Schema: an object of keywords, or a boolean")
+            }
+
+            fn visit_bool<E>(self, value: bool) -> Result<Schema, E> {
+                Ok(Schema::Bool(value))
+            }
+
+            fn visit_map<A: serde::de::MapAccess<'de>>(
+                self,
+                access: A,
+            ) -> Result<Schema, A::Error> {
+                let object = SchemaObject::deserialize(
+                    serde::de::value::MapAccessDeserializer::new(access),
+                )?;
+                Ok(Schema::Object(Box::new(object)))
+            }
+        }
+
+        deserializer.deserialize_any(SchemaVisitor)
     }
 }
 
@@ -714,6 +1128,23 @@ mod tests {
     }
 
     #[test]
+    fn a_type_name_parses_both_ways_and_reports_what_it_expected() {
+        use std::str::FromStr;
+
+        assert_eq!(SchemaType::parse("integer"), Some(SchemaType::Integer));
+        assert_eq!(SchemaType::parse("Integer"), None);
+
+        let error = SchemaType::from_str("strng").unwrap_err();
+        assert_eq!(error.name(), "strng");
+        assert!(error.to_string().contains("is not a JSON Schema type"));
+        assert!(error.to_string().contains("string"));
+
+        for name in SchemaType::NAMES {
+            assert_eq!(SchemaType::parse(name).unwrap().as_str(), name);
+        }
+    }
+
+    #[test]
     fn boolean_schemas_render_as_bare_booleans() {
         assert_eq!(Schema::anything().to_json(), "true");
         assert_eq!(Schema::nothing().to_json(), "false");
@@ -721,11 +1152,171 @@ mod tests {
         assert_eq!(Schema::anything().as_object(), None);
     }
 
+    /// The constant and the struct must not drift apart: every name in the list
+    /// has to be a key the rendered object actually uses, and every key the
+    /// rendered object uses has to be in the list.
+    #[test]
+    fn the_dialect_keyword_list_matches_what_the_struct_renders() {
+        // A schema object with every keyword set, so all 57 render.
+        let mut object = SchemaObject::new();
+        object.schema = Some(DIALECT.into());
+        object.id = Some("https://example.com".into());
+        object.anchor = Some("a".into());
+        object.dynamic_anchor = Some("a".into());
+        object.reference = Some("#".into());
+        object.dynamic_ref = Some("#".into());
+        object.vocabulary = Some(OrderedMap::new());
+        object.comment = Some("c".into());
+        object.title = Some("t".into());
+        object.description = Some("d".into());
+        object.types = Some(TypeSet::One(SchemaType::Object));
+        object.enumeration = Some(Vec::new());
+        object.constant = Some(Value::Null);
+        object.multiple_of = Some(Num::from(1));
+        object.maximum = Some(Num::from(1));
+        object.exclusive_maximum = Some(Num::from(1));
+        object.minimum = Some(Num::from(1));
+        object.exclusive_minimum = Some(Num::from(1));
+        object.max_length = Some(1);
+        object.min_length = Some(1);
+        object.pattern = Some("a".into());
+        object.format = Some(Format::Email);
+        object.prefix_items = Some(Vec::new());
+        object.items = Some(Box::new(Schema::Bool(true)));
+        object.contains = Some(Box::new(Schema::Bool(true)));
+        object.max_contains = Some(1);
+        object.min_contains = Some(1);
+        object.max_items = Some(1);
+        object.min_items = Some(1);
+        object.unique_items = Some(true);
+        object.unevaluated_items = Some(Box::new(Schema::Bool(true)));
+        object.properties = Some(OrderedMap::new());
+        object.required = Some(Vec::new());
+        object.pattern_properties = Some(OrderedMap::new());
+        object.additional_properties = Some(Box::new(Schema::Bool(true)));
+        object.property_names = Some(Box::new(Schema::Bool(true)));
+        object.max_properties = Some(1);
+        object.min_properties = Some(1);
+        object.dependent_required = Some(OrderedMap::new());
+        object.dependent_schemas = Some(OrderedMap::new());
+        object.unevaluated_properties = Some(Box::new(Schema::Bool(true)));
+        object.all_of = Some(Vec::new());
+        object.any_of = Some(Vec::new());
+        object.one_of = Some(Vec::new());
+        object.not = Some(Box::new(Schema::Bool(true)));
+        object.if_schema = Some(Box::new(Schema::Bool(true)));
+        object.then_schema = Some(Box::new(Schema::Bool(true)));
+        object.else_schema = Some(Box::new(Schema::Bool(true)));
+        object.content_encoding = Some("base64".into());
+        object.content_media_type = Some("application/json".into());
+        object.content_schema = Some(Box::new(Schema::Bool(true)));
+        object.default = Some(Value::Null);
+        object.examples = Some(Vec::new());
+        object.deprecated = Some(true);
+        object.read_only = Some(true);
+        object.write_only = Some(true);
+        object.defs = Some(OrderedMap::new());
+
+        let rendered = Schema::from(object).to_value();
+        let keys: Vec<&str> = rendered
+            .as_object()
+            .expect("the object form renders as a JSON object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+
+        for key in &keys {
+            assert!(
+                is_dialect_keyword(key),
+                "`{key}` renders but is missing from DIALECT_KEYWORDS",
+            );
+        }
+        for keyword in DIALECT_KEYWORDS {
+            assert!(
+                keys.contains(&keyword),
+                "DIALECT_KEYWORDS lists `{keyword}`, which the struct never renders",
+            );
+        }
+        assert_eq!(keys.len(), DIALECT_KEYWORDS.len());
+    }
+
     #[test]
     fn an_empty_keyword_bag_renders_as_an_empty_object() {
         let schema = Schema::from(SchemaObject::new());
         assert!(schema.as_object().unwrap().is_empty());
         assert_eq!(schema.to_json(), "{}");
+    }
+
+    #[test]
+    fn an_exported_copy_is_detached_from_the_original() {
+        let schema = Schema::object().title("Original").build().unwrap();
+        let mut copy = schema.export();
+
+        copy.as_object_mut().unwrap().title = Some("Mine".into());
+
+        assert_eq!(copy.as_object().unwrap().title.as_deref(), Some("Mine"));
+        assert_eq!(
+            schema.as_object().unwrap().title.as_deref(),
+            Some("Original")
+        );
+    }
+
+    #[test]
+    fn exporting_a_subschema_yields_a_schema_in_its_own_right() {
+        let schema = Schema::object()
+            .property("address", Schema::object().required(["city"]))
+            .property("tags", Schema::array().items(Schema::string()))
+            .build()
+            .unwrap();
+
+        let address = schema.export_at("/properties/address").unwrap();
+        assert_eq!(
+            address.to_json(),
+            r#"{"type":"object","required":["city"]}"#
+        );
+
+        // Nested positions resolve too.
+        let item = schema.export_at("/properties/tags/items").unwrap();
+        assert_eq!(item, Schema::string().build().unwrap());
+
+        // And the copy is detached.
+        let mut mine = address.export();
+        mine.as_object_mut().unwrap().title = Some("Address".into());
+        assert_eq!(schema.export_at("/properties/address").unwrap(), address);
+    }
+
+    #[test]
+    fn exporting_the_empty_pointer_is_the_whole_schema() {
+        let schema = Schema::string().min_length(2).build().unwrap();
+        assert_eq!(schema.export_at("").unwrap(), schema);
+    }
+
+    #[test]
+    fn exporting_a_place_that_is_not_a_schema_yields_nothing() {
+        let schema = Schema::object()
+            .property("a", Schema::string())
+            .build()
+            .unwrap();
+
+        // `properties` is a map of schemas, not a schema.
+        assert_eq!(schema.export_at("/properties"), None);
+        // A keyword whose value is a plain scalar is not one either.
+        assert_eq!(schema.export_at("/type"), None);
+        // Nor is something absent.
+        assert_eq!(schema.export_at("/properties/missing"), None);
+    }
+
+    #[test]
+    fn a_boolean_subschema_exports_as_one() {
+        let schema = Schema::object()
+            .additional_properties(false)
+            .build()
+            .unwrap();
+
+        assert_eq!(
+            schema.export_at("/additionalProperties"),
+            Some(Schema::Bool(false)),
+        );
     }
 
     #[test]

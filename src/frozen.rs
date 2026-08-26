@@ -100,6 +100,32 @@ impl FrozenSchema {
         Schema::clone(&self.schema)
     }
 
+    /// Returns an owned copy of the schema inside.
+    ///
+    /// Identical to [`thaw`](Self::thaw), under the name the rest of the crate
+    /// uses for the same act — so code that wants a copy out reads the same
+    /// whether it holds a [`Schema`], a `FrozenSchema`, or a builder.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::Schema;
+    /// let frozen = Schema::string().title("Shared").build_frozen()?;
+    ///
+    /// let mut mine = frozen.export();
+    /// mine.as_object_mut().unwrap().title = Some("Mine".into());
+    ///
+    /// assert_eq!(frozen.as_object().unwrap().title.as_deref(), Some("Shared"));
+    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// ```
+    pub fn export(&self) -> Schema {
+        self.thaw()
+    }
+
+    /// Returns an owned copy of the subschema at `pointer`. See
+    /// [`Schema::export_at`].
+    pub fn export_at(&self, pointer: &str) -> Option<Schema> {
+        self.schema.export_at(pointer)
+    }
+
     /// Whether two handles share one underlying schema, as opposed to holding
     /// equal copies of two.
     ///
