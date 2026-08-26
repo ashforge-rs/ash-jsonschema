@@ -242,6 +242,7 @@ impl Compiled {
     #[cfg(test)]
     pub(crate) fn resolve(&self, base: &str, target: &str, dynamic: bool) -> Option<(Value, String)> {
         self.resolve_in_scope(base, target, dynamic, &[])
+            .map(|(value, base, _)| (value, base))
     }
 
     /// Resolves a reference, searching `scope` for a `$dynamicRef`.
@@ -261,7 +262,7 @@ impl Compiled {
         target: &str,
         dynamic: bool,
         scope: &[String],
-    ) -> Option<(Value, String)> {
+    ) -> Option<(Value, String, String)> {
         let (resource_uri, fragment) = uri::resolve(base, target);
 
         if dynamic && !uri::is_pointer_fragment(&fragment) {
@@ -276,7 +277,7 @@ impl Compiled {
                     if let Some(pointer) = self.dynamic_anchors.get(&key) {
                         let resource = self.resources.get(uri)?;
                         let found = resolve_pointer(resource, pointer)?;
-                        return Some((found.clone(), uri.clone()));
+                        return Some((found.clone(), uri.clone(), pointer.clone()));
                     }
                 }
             }
@@ -298,7 +299,7 @@ impl Compiled {
         };
 
         let found = resolve_pointer(resource, &pointer)?;
-        Some((found.clone(), resource_uri))
+        Some((found.clone(), resource_uri, pointer))
     }
 }
 

@@ -58,18 +58,22 @@
 
 mod compile;
 mod eval;
+pub mod formats;
 mod outcome;
+pub mod tld;
 
 use std::sync::Arc;
 
 use serde_json::Value;
 
 pub use compile::CompileError;
-pub use outcome::{Mode, Outcome, ValidationError};
+pub use formats::FormatFn;
+pub use outcome::{Mode, Outcome, OutputFormat, Unit, ValidationError};
 
 use crate::registry::Registry;
 use crate::schema::Schema;
 use compile::Compiled;
+use formats::Formats;
 
 /// A schema, compiled and ready to check instances against.
 ///
@@ -89,6 +93,7 @@ use compile::Compiled;
 #[derive(Clone, Debug)]
 pub struct Validator {
     compiled: Arc<Compiled>,
+    formats: Arc<Formats>,
 }
 
 impl Validator {
@@ -145,10 +150,34 @@ impl Validator {
         Self::build(Arc::new(document.clone()), None)
     }
 
+    /// Starts a validator that needs more than the defaults — a `format` to
+    /// assert, or one of your own.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::{Schema, Validator};
+    /// let schema = Schema::string().format("employee-id").build()?;
+    ///
+    /// let validator = Validator::builder(&schema)
+    ///     .format("employee-id", |value| value.starts_with("E-"))
+    ///     .build()?;
+    ///
+    /// assert!(validator.is_valid(&serde_json::json!("E-1")));
+    /// assert!(!validator.is_valid(&serde_json::json!("X-1")));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn builder(schema: &Schema) -> ValidatorBuilder {
+        ValidatorBuilder::new(Arc::new(schema.to_value()))
+    }
+
+    /// The same, for a document that did not come from this crate's builders.
+    pub fn builder_for_document(document: &Value) -> ValidatorBuilder {
+        ValidatorBuilder::new(Arc::new(document.clone()))
+    }
+
     fn build(document: Arc<Value>, registry: Option<&Registry>) -> Result<Self, CompileError> {
-        Ok(Self {
-            compiled: Arc::new(Compiled::new(document, registry)?),
-        })
+        let mut builder = ValidatorBuilder::new(document);
+        builder.registry = registry.cloned();
+        builder.build()
     }
 
     /// Checks `instance`, reporting according to `mode`.
@@ -168,7 +197,46 @@ impl Validator {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn validate(&self, instance: &Value, mode: Mode) -> Outcome {
-        eval::run(&self.compiled, instance, mode)
+        eval::run(&self.compiled, &self.formats, instance, mode, false)
+    }
+
+    /// Checks `instance`, and collects the annotations it produced.
+    ///
+    /// A separate method rather than a flag on [`validate`](Validator::validate)
+    /// because annotations cost a clone per annotation keyword per instance
+    /// location, and the overwhelmingly common question — *is this valid?* —
+    /// should not pay for an answer it will not read.
+    ///
+    /// Annotations are what `title`, `description`, `default`, `readOnly` and
+    /// their kind contribute: they assert nothing, and instead say something
+    /// about the location they were reached at. A run that fails produces
+    /// none, since an annotation from a rejected schema describes an instance
+    /// that does not exist.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::{Schema, Validator};
+    /// # use ash_jsonschema_builder::validator::Mode;
+    /// let schema = Schema::parse(r#"{
+    ///     "properties": {
+    ///         "id": {"type": "string", "title": "Identifier", "readOnly": true}
+    ///     }
+    /// }"#)?;
+    ///
+    /// let validator = Validator::new(&schema)?;
+    /// let outcome = validator.annotate(&serde_json::json!({"id": "x"}), Mode::All);
+    ///
+    /// assert!(outcome.is_valid());
+    /// let titles: Vec<_> = outcome
+    ///     .annotations
+    ///     .iter()
+    ///     .filter(|unit| unit.keyword() == "title")
+    ///     .map(|unit| unit.instance_location.as_str())
+    ///     .collect();
+    /// assert_eq!(titles, ["/id"]);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn annotate(&self, instance: &Value, mode: Mode) -> Outcome {
+        eval::run(&self.compiled, &self.formats, instance, mode, true)
     }
 
     /// Whether `instance` satisfies the schema, stopping at the first problem.
@@ -232,6 +300,106 @@ impl Validator {
     /// on the validator, which keeps checking what it was built with.
     pub fn export_schema(&self) -> Option<Schema> {
         Schema::from_value(self.compiled.root().clone()).ok()
+    }
+}
+
+/// Assembles a [`Validator`] that needs more than the defaults.
+///
+/// Obtained from [`Validator::builder`]. Every method returns the builder, so
+/// the whole thing reads as one chain ending in
+/// [`build`](ValidatorBuilder::build).
+pub struct ValidatorBuilder {
+    document: Arc<Value>,
+    registry: Option<Registry>,
+    formats: Formats,
+}
+
+impl ValidatorBuilder {
+    fn new(document: Arc<Value>) -> Self {
+        Self {
+            document,
+            registry: None,
+            formats: Formats::default(),
+        }
+    }
+
+    /// Resolves the schema's references through `registry`.
+    pub fn registry(mut self, registry: &Registry) -> Self {
+        self.registry = Some(registry.clone());
+        self
+    }
+
+    /// Asserts every `format` this crate implements, rather than treating them
+    /// as annotations.
+    ///
+    /// 2020-12 makes `format` an annotation by default, and this crate follows
+    /// that — a schema whose `format` rejects data here and passes elsewhere is
+    /// a poor contract, so turning it on is a decision the caller makes.
+    ///
+    /// Covers `date`, `date-time`, `time`, `duration`, `email`, `idn-email`,
+    /// `hostname`, `ipv4`, `ipv6`, `uuid`, `json-pointer`, and
+    /// `relative-json-pointer`. A standard name outside that set stays an
+    /// annotation.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::{Schema, Validator};
+    /// let schema = Schema::string().format("date").build()?;
+    /// let validator = Validator::builder(&schema).assert_formats().build()?;
+    ///
+    /// assert!(validator.is_valid(&serde_json::json!("2024-02-29")));
+    /// assert!(!validator.is_valid(&serde_json::json!("2023-02-29")));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn assert_formats(mut self) -> Self {
+        self.formats.assert_standard();
+        self
+    }
+
+    /// Asserts one `format` with a check of your own.
+    ///
+    /// The name may be anything — one the specification defines, in which case
+    /// this replaces the built-in check, or one only your schemas use. Either
+    /// way the schema stays ordinary JSON: another validator annotates the
+    /// keyword where this one asserts it.
+    ///
+    /// A handler runs whether or not
+    /// [`assert_formats`](Self::assert_formats) was called, and only ever sees
+    /// string instances — `format` says nothing about any other type.
+    ///
+    /// ```
+    /// # use ash_jsonschema_builder::{Schema, Validator};
+    /// # use ash_jsonschema_builder::validator::tld::has_registered_tld;
+    /// # #[cfg(feature = "iana-tlds")] {
+    /// let schema = Schema::string().format("hostname").build().unwrap();
+    ///
+    /// let validator = Validator::builder(&schema)
+    ///     .format("hostname", has_registered_tld)
+    ///     .build()
+    ///     .unwrap();
+    ///
+    /// assert!(validator.is_valid(&serde_json::json!("example.com")));
+    /// assert!(!validator.is_valid(&serde_json::json!("example.invalid-tld")));
+    /// # }
+    /// ```
+    pub fn format<F>(mut self, name: impl Into<String>, check: F) -> Self
+    where
+        F: Fn(&str) -> bool + Send + Sync + 'static,
+    {
+        self.formats.insert(name, Arc::new(check));
+        self
+    }
+
+    /// Compiles the schema.
+    ///
+    /// # Errors
+    ///
+    /// As [`Validator::new`]: a `pattern` that will not compile, or a document
+    /// that is not a schema.
+    pub fn build(self) -> Result<Validator, CompileError> {
+        Ok(Validator {
+            compiled: Arc::new(Compiled::new(self.document, self.registry.as_ref())?),
+            formats: Arc::new(self.formats),
+        })
     }
 }
 

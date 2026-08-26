@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // whoever owns that part of the payload.
     println!("just the `total` field:");
     for error in outcome.at("/total") {
-        println!("  {} — {}", error.location, error.message);
+        println!("  {} — {}", error.instance_location, error.message());
     }
 
     // `format` is an annotation in 2020-12, not an assertion, so the malformed

@@ -205,30 +205,47 @@
 //!
 //! ## Validating instances
 //!
-//! [`Validator`] answers the other question: does this JSON satisfy the schema?
+//! Behind the **`validation`** feature, on by default: the `validator` module
+//! answers the other question — does this JSON satisfy the schema?
 //!
-//! ```
-//! # use ash_jsonschema_builder::{Schema, Validator, object};
-//! # use ash_jsonschema_builder::validator::Mode;
-//! let validator = Validator::new(&object! {
-//!     required "id": Schema::string().min_length(1),
-//! }.build()?)?;
+#![cfg_attr(
+    feature = "validation",
+    doc = r#"
+```
+# use ash_jsonschema_builder::{Schema, Validator, object};
+# use ash_jsonschema_builder::validator::Mode;
+let validator = Validator::new(&object! {
+    required "id": Schema::string().min_length(1),
+}.build()?)?;
+
+assert!(validator.is_valid(&serde_json::json!({"id": "a1"})));
+
+let outcome = validator.validate(&serde_json::json!({}), Mode::All);
+assert_eq!(outcome.first().unwrap().message(), "`id` is required");
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
+"#
+)]
 //!
-//! assert!(validator.is_valid(&serde_json::json!({"id": "a1"})));
-//!
-//! let outcome = validator.validate(&serde_json::json!({}), Mode::All);
-//! assert_eq!(outcome.first().unwrap().message, "`id` is required");
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
-//!
-//! A validator's schema is fixed for its life. [`Mode::All`] reports every
-//! error and [`Mode::FailFast`] stops at the first; both give an [`Outcome`]
-//! whose errors name where in the instance the problem is *and* which schema
-//! keyword rejected it.
+//! A validator's schema is fixed for its life. `Mode::All` reports every error
+//! and `Mode::FailFast` stops at the first; both give an `Outcome` whose errors
+//! name where in the instance the problem is *and* which schema keyword
+//! rejected it.
 //!
 //! Coverage is every assertion and applicator of the dialect, including
-//! `unevaluated*` and `$dynamicRef`. `format` and the content vocabulary are
-//! annotations in 2020-12 and are not asserted.
+//! `unevaluated*` and `$dynamicRef`.
+//!
+//! `format` is an annotation by default, as 2020-12 specifies. Asking for it —
+//! `Validator::builder(&schema).assert_formats()` — turns on checks for the
+//! temporal, address, and pointer formats, and `.format(name, check)` registers
+//! a rule of your own under any name. `validator::tld` answers whether a
+//! hostname's suffix is shaped like a TLD, or (behind `iana-tlds`) is one that
+//! exists.
+//!
+//! Turn the feature off — `default-features = false` — for a build that only
+//! writes and reads schemas. No dependency goes with it: `regex-lite` is needed
+//! either way, since the meta-schema check `.build()` runs asserts patterns of
+//! its own. What goes is the evaluator, about a fifth of the crate.
 //!
 //! ## What this crate does not do
 //!
@@ -260,6 +277,7 @@ pub mod meta;
 pub mod registry;
 pub mod schema;
 pub mod uri;
+#[cfg(feature = "validation")]
 pub mod validator;
 mod validate;
 pub mod walk;
@@ -280,7 +298,10 @@ pub use schema::{
     is_dialect_keyword,
 };
 pub use validate::validate_document;
-pub use validator::{CompileError, Mode, Outcome, ValidationError, Validator};
+#[cfg(feature = "validation")]
+pub use validator::{
+    CompileError, Mode, Outcome, OutputFormat, Unit, ValidationError, Validator,
+};
 
 /// The types a typical caller wants in scope.
 ///

@@ -11,6 +11,32 @@ repository = "https://github.com/ashforge-rs/ash-jsonschema"
 keywords = ["jsonschema", "json-schema", "builder", "schema", "validation"]
 categories = ["data-structures", "encoding", "rust-patterns"]
 
+# docs.rs builds with every feature on, so the gated items appear. Rustdoc
+# labels each with the feature it needs on its own — `doc_auto_cfg` is no longer
+# a feature to opt into.
+[package.metadata.docs.rs]
+all-features = true
+
+[features]
+default = ["validation"]
+# Checking instances against schemas: `Validator`, `Outcome`, and the
+# `validator!` macro. The rest of the crate builds, reads, resolves, compares,
+# and bundles schemas as documents, and needs none of it — turn this off with
+# `default-features = false` for a build that only writes schemas.
+#
+# It gates no dependency — `regex-lite` is needed either way, since the
+# meta-schema check `.build()` runs asserts two patterns of its own. What it
+# gates is the evaluator: roughly a fifth of the crate's source, and about half
+# a second of a clean build.
+validation = []
+# The IANA root zone, vendored so `validator::tld` can answer whether a
+# top-level domain actually exists. About 9 KB of data and 1,438 entries.
+#
+# Off by default, and deliberately: the list is a *snapshot*, so a build from
+# last year rejects a TLD delegated this year. `is_tld_shaped` needs no list and
+# never goes stale, which is the safer default for most schemas.
+iana-tlds = ["validation"]
+
 [dependencies]
 # The schema tree is a plain `Serialize` document; serde's derive writes the
 # keyword renames (`$id`, `multipleOf`, …) and drops every unset keyword.
@@ -25,3 +51,22 @@ serde_json = "1"
 # compiled once at load, so none of the larger crate's throughput work would
 # ever pay for its dependencies or compile time.
 regex-lite = "0.1"
+
+# The validator's own example and integration tests exist only when the
+# evaluator does. Declaring that here keeps the files themselves free of
+# `#![cfg]` prologues.
+[[example]]
+name = "validate"
+required-features = ["validation"]
+
+[[test]]
+name = "validator"
+required-features = ["validation"]
+
+[[test]]
+name = "formats"
+required-features = ["validation"]
+
+[[example]]
+name = "formats"
+required-features = ["validation"]

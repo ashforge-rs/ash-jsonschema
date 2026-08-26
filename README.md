@@ -364,6 +364,8 @@ schema, so `/properties` (a map of them) does not count.
 
 ## Validating instances
 
+*Behind the `validation` feature, on by default.*
+
 The rest of the crate treats a schema as a document. `Validator` is the other
 half: given a schema, does this JSON satisfy it?
 
@@ -417,10 +419,76 @@ Measured against the official
 `$vocabulary` declarations that disable keywords, and `$dynamicRef` resolution
 across several intermediate scopes.
 
-Two things are deliberately not asserted: `format`, which 2020-12 defines as an
-annotation by default, and the content vocabulary, which is likewise an
-annotation. `pattern` uses `regex-lite`, so a pattern needing lookahead or
-backreferences is reported at construction rather than silently not applying.
+The content vocabulary is not asserted — 2020-12 defines it as an annotation.
+`pattern` uses `regex-lite`, so a pattern needing lookahead or backreferences is
+reported at construction rather than silently not applying.
+
+### `format`, and rules of your own
+
+2020-12 makes `format` an annotation by default, and so does this crate: a
+schema whose `format` rejects data here and passes elsewhere is a poor contract,
+so asserting it is a decision you make.
+
+```rust
+let validator = Validator::builder(&schema)
+    .assert_formats()                        // the built-in checks
+    .format("ticket-ref", |value| {          // one of your own
+        value.strip_prefix("ASH-")
+            .is_some_and(|rest| rest.chars().all(|c| c.is_ascii_digit()))
+    })
+    .build()?;
+```
+
+A handler is just `Fn(&str) -> bool`. The name may be one the specification
+defines — in which case yours replaces the built-in — or one only your schemas
+use. Either way the schema stays ordinary JSON, so another validator annotates
+where this one asserts. Registering a handler asserts that name whether or not
+`assert_formats()` was called.
+
+Built-in checks: `date`, `date-time`, `time`, `duration`, `email`, `idn-email`,
+`hostname`, `ipv4`, `ipv6`, `uuid`, `json-pointer`, `relative-json-pointer`.
+Dates are checked against the calendar, not just the shape — `2023-02-29` is
+rejected and `2024-02-29` is not — and a leap second is only accepted where one
+is actually inserted.
+
+Against the official suite's optional `format` tests, the temporal and address
+formats pass **100%** (`date`, `date-time`, `time`, `duration`, `ipv4`, `ipv6`,
+`uuid`, and both pointer formats). Two limits are deliberate and documented:
+`xn--` labels are checked for shape but not decoded, and the quoted local-part
+form of an email address is rejected rather than half-parsed. Both need IDNA
+rules this crate does not implement.
+
+### Top-level domains
+
+`validator::tld` answers two different questions:
+
+```rust
+has_tld_shaped_suffix("example.zzz")   // true  — well formed
+has_registered_tld("example.zzz")      // false — no such TLD
+```
+
+The structural rule needs no data and never goes stale. The membership test is
+behind the **`iana-tlds`** feature, which vendors the IANA root zone (~9 KB,
+1,438 entries). That list is a *snapshot*: a build from last year rejects a
+domain delegated this year. Structure is therefore the default, and the list is
+opt-in with the caveat stated.
+
+### Features
+
+| Feature | Default | What it adds |
+|---|---|---|
+| `validation` | on | `Validator`, `Outcome`, the `validator!` macro, and `format` handlers |
+| `iana-tlds` | off | The vendored IANA root zone, for `is_registered_tld` |
+
+```toml
+ash-jsonschema-builder = { version = "0.1", default-features = false }
+```
+
+Building, reading, resolving, diffing, and bundling all work without it. No
+dependency goes with the feature — `regex-lite` is needed either way, for the
+patterns the meta-schema check asserts — so what you save is the evaluator
+itself: about a fifth of the crate's source, and roughly half a second of a
+clean build.
 
 ## What this crate does not do
 

@@ -25,7 +25,8 @@ use serde_json::{Map, Value};
 use crate::meta::escape_pointer_token;
 use crate::uri;
 use crate::validator::compile::Compiled;
-use crate::validator::outcome::{Mode, Outcome, ValidationError, one_line};
+use crate::validator::formats::Formats;
+use crate::validator::outcome::{Mode, Outcome, Unit, one_line};
 
 /// How deep the evaluator will recurse before giving up.
 ///
@@ -70,13 +71,44 @@ impl Evaluated {
 
 pub(crate) struct Evaluator<'c> {
     pub(crate) compiled: &'c Compiled,
+    pub(crate) formats: &'c Formats,
     pub(crate) mode: Mode,
-    pub(crate) errors: Vec<ValidationError>,
+    /// Units collected at the current nesting level.
+    ///
+    /// A stack rather than one flat list, because a failed `anyOf` branch is
+    /// not an error on its own — it is *evidence* for the `anyOf` that failed
+    /// above it. Pushing a frame around a branch collects that evidence
+    /// separately, so it can be attached to the parent instead of being
+    /// discarded or reported as a top-level failure.
+    pub(crate) frames: Vec<Vec<Unit>>,
     /// Non-zero while inside a branch whose failure is not itself an error —
     /// an `anyOf` alternative, an `if` condition, the subject of a `not`.
     pub(crate) silent: usize,
     pub(crate) depth: usize,
+    /// The annotations produced so far.
+    ///
+    /// Collected only when a caller asked for them, since building the list
+    /// costs a clone per annotation keyword per instance location and the
+    /// common case never reads it.
+    pub(crate) annotations: Option<Vec<Unit>>,
 }
+
+/// The keywords that produce an annotation rather than an assertion.
+///
+/// Every one of them always succeeds; what it contributes is its own value,
+/// attached to the instance location it was reached at. `format` is here too:
+/// 2020-12 makes it an annotation by default, and this crate only turns it
+/// into an assertion when asked.
+const ANNOTATION_KEYWORDS: [&str; 8] = [
+    "title",
+    "description",
+    "default",
+    "deprecated",
+    "readOnly",
+    "writeOnly",
+    "examples",
+    "format",
+];
 
 /// Where a subschema is being applied: the schema side and the instance side.
 #[derive(Clone, Copy)]
@@ -87,6 +119,14 @@ struct Where<'a> {
     location: &'a str,
     /// The base URI in force, which a relative `$ref` resolves against.
     base: &'a str,
+    /// The pointer into the *resolved* resource, as opposed to the path the
+    /// evaluation walked to get here.
+    ///
+    /// After a `$ref`, `keyword` keeps growing — `/properties/a/$ref/minimum` —
+    /// while the schema the keyword actually lives in restarts at the
+    /// reference target. This is that restart, and pairing it with `base` is
+    /// what makes `absoluteKeywordLocation` point at something real.
+    resolved: &'a str,
     /// Every resource entered on the way here, outermost first.
     ///
     /// `$dynamicRef` searches this rather than the schema as written: which
@@ -99,21 +139,113 @@ struct Where<'a> {
 impl Evaluator<'_> {
     /// Whether enough has gone wrong to stop.
     fn done(&self) -> bool {
-        self.mode == Mode::FailFast && !self.errors.is_empty() && self.silent == 0
+        self.mode == Mode::FailFast
+            && self.silent == 0
+            && self.frames.last().is_some_and(|frame| !frame.is_empty())
     }
 
+    /// Records a failure at the current nesting level.
     fn report(&mut self, at: Where<'_>, keyword: &str, message: impl Into<String>) {
-        if self.silent > 0 {
+        let unit = self.unit(at, keyword, Some(message.into()), false);
+        self.push_unit(unit);
+    }
+
+    /// Builds one output unit for a keyword at this position.
+    ///
+    /// `absoluteKeywordLocation` is written only once the evaluation has
+    /// crossed a reference — which is exactly when the keyword path stops
+    /// naming a place you can find, and exactly when the specification
+    /// requires it.
+    fn unit(
+        &self,
+        at: Where<'_>,
+        keyword: &str,
+        error: Option<String>,
+        valid: bool,
+    ) -> Unit {
+        let keyword_location = match keyword.is_empty() {
+            true => at.keyword.to_owned(),
+            false => format!("{}/{keyword}", at.keyword),
+        };
+        let absolute = match crossed_a_reference(&keyword_location) {
+            true => Some(absolute_location(at.base, at.resolved, keyword)),
+            false => None,
+        };
+        Unit {
+            valid,
+            keyword_location,
+            absolute_keyword_location: absolute,
+            instance_location: at.location.to_owned(),
+            error,
+            annotation: None,
+            errors: Vec::new(),
+        }
+    }
+
+    /// Adds a unit to the frame in force.
+    fn push_unit(&mut self, unit: Unit) {
+        match self.frames.last_mut() {
+            Some(frame) => frame.push(unit),
+            None => self.frames.push(vec![unit]),
+        }
+    }
+
+    /// Records the annotation keywords present at this position.
+    ///
+    /// Suppressed inside a silent branch: an annotation from an alternative
+    /// that may yet fail cannot be kept, because the specification drops the
+    /// annotations of any schema that did not match.
+    fn collect_annotations(&mut self, map: &Map<String, Value>, at: Where<'_>) {
+        if self.annotations.is_none() || self.silent > 0 {
             return;
         }
-        self.errors.push(ValidationError {
-            location: at.location.to_owned(),
-            keyword: match keyword.is_empty() {
-                true => at.keyword.to_owned(),
-                false => format!("{}/{keyword}", at.keyword),
+        for keyword in ANNOTATION_KEYWORDS {
+            let Some(value) = map.get(keyword) else {
+                continue;
+            };
+            let mut unit = self.unit(at, keyword, None, true);
+            unit.annotation = Some(value.clone());
+            if let Some(collected) = self.annotations.as_mut() {
+                collected.push(unit);
+            }
+        }
+    }
+
+    /// Wraps what one failed branch collected into a single unit.
+    ///
+    /// The branch itself gets a unit even though no keyword of its own
+    /// failed — it is the thing that did not match, and without it the
+    /// evidence beneath would float free of the alternative it belongs to.
+    fn branch_unit(&self, at: Where<'_>, collected: Vec<Unit>) -> Unit {
+        let mut unit = self.unit(
+            at,
+            "",
+            match collected.is_empty() {
+                true => Some("does not match".to_owned()),
+                false => None,
             },
-            message: message.into(),
-        });
+            false,
+        );
+        unit.errors = collected;
+        unit
+    }
+
+    /// Evaluates `body` as a branch whose failure is not itself an error.
+    ///
+    /// The two halves are inseparable, which is why they are one method: a
+    /// branch that is silent must also be framed. Silencing alone would let
+    /// the branch's units land in the enclosing frame, where — under
+    /// [`Mode::FailFast`] — they read as a failure of the schema rather than
+    /// of the alternative, and stop a run that should have continued.
+    ///
+    /// Used by `anyOf`, `oneOf`, `if`, `not`, and `contains`.
+    fn silently<T>(&mut self, body: impl FnOnce(&mut Self) -> T) -> (T, Vec<Unit>) {
+        self.frames.push(Vec::new());
+        self.silent += 1;
+        let value = body(self);
+        self.silent -= 1;
+        let collected = self.frames.pop().unwrap_or_default();
+        (value, collected)
     }
 
     /// Evaluates `schema` against `instance`, returning whether it matched and
@@ -194,6 +326,8 @@ impl Evaluator<'_> {
         let mut valid = true;
         let mut evaluated = Evaluated::default();
 
+        self.collect_annotations(map, at);
+
         // --- references ---------------------------------------------------
         // In 2020-12 `$ref` sits alongside its siblings rather than replacing
         // them, so what it evaluates joins theirs.
@@ -206,12 +340,15 @@ impl Evaluator<'_> {
                 .compiled
                 .resolve_in_scope(at.base, target, dynamic, at.dynamic)
             {
-                Some((resolved, resolved_base)) => {
+                Some((resolved, resolved_base, resolved_pointer)) => {
                     let scope = push_scope(at.dynamic, &resolved_base);
                     let inner = Where {
                         keyword: &format!("{}/{keyword}", at.keyword),
                         location: at.location,
                         base: &resolved_base,
+                        // The path through the schema keeps growing, but the
+                        // keyword now lives somewhere else entirely.
+                        resolved: &resolved_pointer,
                         dynamic: &scope,
                     };
                     let (ok, seen) = self.eval(&resolved, instance, inner);
@@ -412,6 +549,17 @@ impl Evaluator<'_> {
             self.report(at, "pattern", format!("must match /{pattern}/"));
             valid = false;
         }
+
+        // `format` asserts only what the caller asked it to; left alone it is
+        // the annotation 2020-12 makes it by default.
+        if !self.formats.is_inert()
+            && let Some(name) = map.get("format").and_then(Value::as_str)
+            && self.formats.check(name, text) == Some(false)
+        {
+            self.report(at, "format", format!("is not a valid {name}"));
+            valid = false;
+        }
+
         valid
     }
 
@@ -468,6 +616,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: &location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, _) = self.eval(schema, &items[index], inner);
@@ -487,6 +636,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: &location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, _) = self.eval(schema, item, inner);
@@ -510,11 +660,10 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: &location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
-                self.silent += 1;
-                let (ok, _) = self.eval(schema, item, inner);
-                self.silent -= 1;
+                let ((ok, _), _) = self.silently(|me| me.eval(schema, item, inner));
                 if ok {
                     matched += 1;
                     // Only the items that *match* are evaluated, and they need
@@ -625,6 +774,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: &location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, _) = self.eval(schema, value, inner);
@@ -654,6 +804,7 @@ impl Evaluator<'_> {
                         keyword: &keyword,
                         location: &location,
                         base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                     };
                     let (ok, _) = self.eval(schema, &object[name], inner);
@@ -679,6 +830,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: &location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, _) = self.eval(schema, &object[name], inner);
@@ -699,6 +851,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: &location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 // The instance handed to `propertyNames` is the name itself.
@@ -724,6 +877,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: at.location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, seen) = self.eval(schema, instance, inner);
@@ -756,6 +910,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: at.location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, seen) = self.eval(schema, instance, inner);
@@ -771,27 +926,38 @@ impl Evaluator<'_> {
 
         if let Some(Value::Array(branches)) = map.get("anyOf") {
             let mut matched = false;
+            let mut evidence = Vec::new();
             for (index, schema) in branches.iter().enumerate() {
                 let keyword = format!("{}/anyOf/{index}", at.keyword);
                 let inner = Where {
                     keyword: &keyword,
                     location: at.location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 // A branch that fails is not an error — only all of them
-                // failing is — so its errors are suppressed.
-                self.silent += 1;
-                let (ok, seen) = self.eval(schema, instance, inner);
-                self.silent -= 1;
+                // failing is. Its units are collected as evidence for the
+                // `anyOf` instead, so a reader can see how close each
+                // alternative came.
+                let ((ok, seen), branch) = self.silently(|me| me.eval(schema, instance, inner));
                 if ok {
                     matched = true;
                     // Only a *successful* branch contributes annotations.
                     evaluated.absorb(seen);
+                } else {
+                    evidence.push(self.branch_unit(inner, branch));
                 }
             }
             if !matched {
-                self.report(at, "anyOf", "does not match any permitted alternative");
+                let mut unit = self.unit(
+                    at,
+                    "anyOf",
+                    Some("does not match any permitted alternative".to_owned()),
+                    false,
+                );
+                unit.errors = evidence;
+                self.push_unit(unit);
                 valid = false;
                 if self.done() {
                     return (valid, evaluated);
@@ -802,26 +968,35 @@ impl Evaluator<'_> {
         if let Some(Value::Array(branches)) = map.get("oneOf") {
             let mut matches = Vec::new();
             let mut winner = Evaluated::default();
+            let mut evidence = Vec::new();
             for (index, schema) in branches.iter().enumerate() {
                 let keyword = format!("{}/oneOf/{index}", at.keyword);
                 let inner = Where {
                     keyword: &keyword,
                     location: at.location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
-                self.silent += 1;
-                let (ok, seen) = self.eval(schema, instance, inner);
-                self.silent -= 1;
+                let ((ok, seen), branch) = self.silently(|me| me.eval(schema, instance, inner));
                 if ok {
                     matches.push(index);
                     winner = seen;
+                } else {
+                    evidence.push(self.branch_unit(inner, branch));
                 }
             }
             match matches.len() {
                 1 => evaluated.absorb(winner),
                 0 => {
-                    self.report(at, "oneOf", "does not match any permitted alternative");
+                    let mut unit = self.unit(
+                        at,
+                        "oneOf",
+                        Some("does not match any permitted alternative".to_owned()),
+                        false,
+                    );
+                    unit.errors = evidence;
+                    self.push_unit(unit);
                     valid = false;
                 }
                 count => {
@@ -849,11 +1024,10 @@ impl Evaluator<'_> {
                 keyword: &keyword,
                 location: at.location,
                 base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
             };
-            self.silent += 1;
-            let (ok, _) = self.eval(schema, instance, inner);
-            self.silent -= 1;
+            let ((ok, _), _) = self.silently(|me| me.eval(schema, instance, inner));
             if ok {
                 self.report(at, "not", "must not match, but does");
                 valid = false;
@@ -871,11 +1045,10 @@ impl Evaluator<'_> {
                 keyword: &keyword,
                 location: at.location,
                 base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
             };
-            self.silent += 1;
-            let (matched, seen) = self.eval(condition, instance, inner);
-            self.silent -= 1;
+            let ((matched, seen), _) = self.silently(|me| me.eval(condition, instance, inner));
 
             let branch = match matched {
                 true => {
@@ -890,6 +1063,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: at.location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, seen) = self.eval(schema, instance, inner);
@@ -930,6 +1104,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: &location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, _) = self.eval(schema, &object[&name], inner);
@@ -954,6 +1129,7 @@ impl Evaluator<'_> {
                     keyword: &keyword,
                     location: &location,
                     base: at.base,
+                    resolved: at.resolved,
                     dynamic: at.dynamic,
                 };
                 let (ok, _) = self.eval(schema, item, inner);
@@ -971,13 +1147,21 @@ impl Evaluator<'_> {
 }
 
 /// Runs a compiled schema over an instance.
-pub(crate) fn run(compiled: &Compiled, instance: &Value, mode: Mode) -> Outcome {
+pub(crate) fn run(
+    compiled: &Compiled,
+    formats: &Formats,
+    instance: &Value,
+    mode: Mode,
+    annotations: bool,
+) -> Outcome {
     let mut evaluator = Evaluator {
         compiled,
+        formats,
         mode,
-        errors: Vec::new(),
+        frames: vec![Vec::new()],
         silent: 0,
         depth: 0,
+        annotations: annotations.then(Vec::new),
     };
     let root = compiled.root();
     let scope = [compiled.base().to_owned()];
@@ -985,16 +1169,65 @@ pub(crate) fn run(compiled: &Compiled, instance: &Value, mode: Mode) -> Outcome 
         keyword: "",
         location: "",
         base: compiled.base(),
+        resolved: "",
         dynamic: &scope,
     };
-    evaluator.eval(root, instance, at);
+    let (valid, _) = evaluator.eval(root, instance, at);
 
-    Outcome {
-        errors: evaluator.errors,
+    let collected = evaluator.frames.pop().unwrap_or_default();
+    let annotations = evaluator.annotations.take().unwrap_or_default();
+    if valid && collected.is_empty() {
+        return Outcome::from_parts(
+            Unit {
+                valid: true,
+                ..Unit::default()
+            },
+            annotations,
+        );
     }
+
+    // One root unit holding the run, so the tree has a single top even when
+    // several independent keywords failed at the root.
+    Outcome::from_parts(
+        Unit {
+            valid: false,
+            keyword_location: String::new(),
+            absolute_keyword_location: None,
+            instance_location: String::new(),
+            error: match collected.is_empty() {
+                true => Some("does not satisfy the schema".to_owned()),
+                false => None,
+            },
+            annotation: None,
+            errors: collected,
+        },
+        annotations,
+    )
 }
 
 // --- helpers --------------------------------------------------------------
+
+/// Whether a keyword path crossed a reference.
+///
+/// The specification requires `absoluteKeywordLocation` exactly here: once the
+/// path contains a `$ref` or `$dynamicRef` hop, the keyword location alone no
+/// longer says which document the keyword is in.
+fn crossed_a_reference(keyword_location: &str) -> bool {
+    keyword_location.contains("/$ref/") || keyword_location.contains("/$dynamicRef/")
+}
+
+/// The absolute URI of a keyword: the resource it resolved into, plus a
+/// pointer fragment naming the keyword within it.
+fn absolute_location(base: &str, resolved: &str, keyword: &str) -> String {
+    let pointer = match keyword.is_empty() {
+        true => resolved.to_owned(),
+        false => format!("{resolved}/{keyword}"),
+    };
+    // A base that already carries a fragment has it replaced: the pointer is
+    // relative to the resource, not to whatever fragment led there.
+    let resource = base.split('#').next().unwrap_or(base);
+    format!("{resource}#{pointer}")
+}
 
 /// One numeric bound: its keyword, the test it makes, and how to word a
 /// failure.

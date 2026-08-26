@@ -46,9 +46,9 @@ fn an_error_names_where_in_the_data_and_which_rule() {
     let outcome = validator_for(&schema).validate(&serde_json::json!({"age": 3}), Mode::All);
     let error = outcome.first().unwrap();
 
-    assert_eq!(error.location, "/age");
-    assert_eq!(error.keyword, "/properties/age/minimum");
-    assert!(error.message.contains("18"));
+    assert_eq!(error.instance_location, "/age");
+    assert_eq!(error.keyword_location, "/properties/age/minimum");
+    assert!(error.message().contains("18"));
 }
 
 #[test]
@@ -200,11 +200,17 @@ fn one_of_requires_exactly_one_match() {
     // Matches both, which `oneOf` forbids.
     let outcome = validator.validate(&serde_json::json!(5), Mode::All);
     assert!(!outcome.is_valid());
-    assert!(outcome.first().unwrap().message.contains("exactly one"));
+    assert!(outcome.first().unwrap().message().contains("exactly one"));
 }
 
+/// A failed `anyOf` keeps each alternative's reason, nested under it.
+///
+/// "does not match any permitted alternative" on its own is the least useful
+/// thing a validator can say, because the question it leaves unanswered is
+/// which alternative was meant and how close it came. The tree keeps that;
+/// the flat view surfaces the branch reasons as the leaves they are.
 #[test]
-fn a_failing_branch_reports_only_the_outer_failure() {
+fn a_failing_branch_keeps_every_alternatives_reason() {
     let schema = Schema::any_of([
         Schema::from(Schema::string()),
         Schema::from(Schema::integer()),
@@ -214,9 +220,22 @@ fn a_failing_branch_reports_only_the_outer_failure() {
 
     let outcome = validator_for(&schema).validate(&serde_json::json!(true), Mode::All);
 
-    // One error about the `anyOf`, not one per branch that happened to fail.
-    assert_eq!(outcome.errors.len(), 1);
-    assert_eq!(outcome.first().unwrap().keyword, "/anyOf");
+    // The tree is rooted at the `anyOf` that failed.
+    let anyof = &outcome.unit().errors[0];
+    assert_eq!(anyof.keyword_location, "/anyOf");
+    assert_eq!(anyof.errors.len(), 2, "one unit per failed alternative");
+    assert_eq!(anyof.errors[0].keyword_location, "/anyOf/0");
+    assert_eq!(anyof.errors[1].keyword_location, "/anyOf/1");
+
+    // The flat view gives the reasons, not the scaffolding.
+    assert_eq!(outcome.errors.len(), 2);
+    assert!(
+        outcome
+            .errors
+            .iter()
+            .all(|error| error.keyword() == "type"),
+        "each leaf is the `type` that rejected that branch",
+    );
 }
 
 #[test]
@@ -329,7 +348,7 @@ fn a_reference_across_documents_needs_the_registry() {
     // The same schema without the registry cannot follow the reference.
     let alone = Validator::new(&user).unwrap();
     let outcome = alone.validate(&serde_json::json!({"address": {}}), Mode::All);
-    assert!(outcome.first().unwrap().message.contains("resolves to nothing"));
+    assert!(outcome.first().unwrap().message().contains("resolves to nothing"));
 }
 
 #[test]
@@ -373,7 +392,7 @@ fn a_reference_cycle_that_consumes_no_instance_reports_rather_than_overflowing()
         outcome
             .errors
             .iter()
-            .any(|error| error.message.contains("too deeply"))
+            .any(|error| error.message().contains("too deeply"))
     );
 }
 
@@ -411,5 +430,5 @@ fn a_serializable_value_can_be_checked_directly() {
             age: 3,
         })
         .unwrap();
-    assert_eq!(outcome.first().unwrap().location, "/age");
+    assert_eq!(outcome.first().unwrap().instance_location, "/age");
 }
