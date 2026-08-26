@@ -20,7 +20,7 @@
 /// comes back with its leading `/`, and a plain-name anchor comes back bare.
 ///
 /// ```
-/// # use ash_jsonschema_builder::uri::resolve;
+/// # use ash_jsonschema::uri::resolve;
 /// let base = "https://example.com/schemas/user";
 ///
 /// // A bare fragment keeps the base resource.
@@ -80,7 +80,7 @@ pub fn resolve(base: &str, reference: &str) -> (String, String) {
 /// forbids a leading `/`, so the test is unambiguous.
 ///
 /// ```
-/// # use ash_jsonschema_builder::uri::is_pointer_fragment;
+/// # use ash_jsonschema::uri::is_pointer_fragment;
 /// assert!(is_pointer_fragment(""));            // the whole resource
 /// assert!(is_pointer_fragment("/$defs/A"));
 /// assert!(!is_pointer_fragment("my-anchor"));
@@ -124,7 +124,7 @@ pub fn remove_dot_segments(uri: &str) -> String {
 /// already the reported outcome.
 ///
 /// ```
-/// # use ash_jsonschema_builder::uri::decode_fragment;
+/// # use ash_jsonschema::uri::decode_fragment;
 /// assert_eq!(decode_fragment("/$defs/percent%25field"), "/$defs/percent%field");
 /// assert_eq!(decode_fragment("/$defs/foo%22bar"), r#"/$defs/foo"bar"#);
 /// assert_eq!(decode_fragment("/$defs/plain"), "/$defs/plain");
@@ -159,7 +159,7 @@ pub fn decode_fragment(fragment: &str) -> String {
 /// Strips any fragment from a URI, leaving the resource it identifies.
 ///
 /// ```
-/// # use ash_jsonschema_builder::uri::resource_of;
+/// # use ash_jsonschema::uri::resource_of;
 /// assert_eq!(resource_of("https://example.com/a#/b"), "https://example.com/a");
 /// assert_eq!(resource_of("https://example.com/a"), "https://example.com/a");
 /// ```

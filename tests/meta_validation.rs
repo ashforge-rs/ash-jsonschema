@@ -2,7 +2,7 @@
 //! meta-schema. These tests pin down what that catches, where it says the
 //! problem is, and what it deliberately lets through.
 
-use ash_jsonschema_builder::{Schema, SchemaObject, SchemaType, TypeSet};
+use ash_jsonschema::{Schema, SchemaObject, SchemaType, TypeSet};
 
 /// Builds, expects rejection, and returns the first violation's
 /// `(location, rule, message)`.
@@ -238,8 +238,8 @@ fn build_unchecked_skips_the_check_entirely() {
 /// recursion, all eight documents, every applicator they use.
 #[test]
 fn the_meta_schema_validates_against_itself() {
-    use ash_jsonschema_builder::meta::{DOCUMENTS, MetaSchema};
-    use ash_jsonschema_builder::validate_document;
+    use ash_jsonschema::meta::{DOCUMENTS, MetaSchema};
+    use ash_jsonschema::validate_document;
 
     let meta = MetaSchema::current();
     for document in DOCUMENTS {

@@ -4,7 +4,7 @@
 //! cover the other direction: parsing a document that already exists, keeping
 //! everything it arrived with, and resuming a builder chain on top of it.
 
-use ash_jsonschema_builder::{ParseError, Schema, SchemaType, StringBuilder, TypeSet};
+use ash_jsonschema::{ParseError, Schema, SchemaType, StringBuilder, TypeSet};
 
 /// A document written the way this crate renders one survives the trip out and
 /// back byte for byte.

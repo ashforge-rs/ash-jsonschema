@@ -16,7 +16,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// A `format` attribute.
 ///
 /// ```
-/// # use ash_jsonschema_builder::Format;
+/// # use ash_jsonschema::Format;
 /// assert_eq!(Format::DateTime.as_str(), "date-time");
 /// assert_eq!(Format::from("email"), Format::Email);
 /// assert_eq!(Format::from("snowflake"), Format::Custom("snowflake".into()));

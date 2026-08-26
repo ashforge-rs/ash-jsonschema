@@ -6,8 +6,8 @@
 //! caught during development, so a regression shows up without the suite
 //! present.
 
-use ash_jsonschema_builder::validator::Mode;
-use ash_jsonschema_builder::{CompileError, Registry, Schema, Validator, object, validator};
+use ash_jsonschema::validator::Mode;
+use ash_jsonschema::{CompileError, Registry, Schema, Validator, object, validator};
 
 fn validator_for(schema: &Schema) -> Validator {
     Validator::new(schema).expect("the schema compiles")

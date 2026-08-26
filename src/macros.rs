@@ -17,7 +17,7 @@
 /// earns its place.
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Schema, object};
+/// # use ash_jsonschema::{Schema, object};
 /// let user = object! {
 ///     required "id": Schema::string().format("uuid"),
 ///     required "email": Schema::string().format("email"),
@@ -28,7 +28,7 @@
 ///
 /// assert_eq!(user.as_object().unwrap().required.as_ref().unwrap(), &["id", "email"]);
 /// assert!(user.property("age").is_some());
-/// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+/// # Ok::<(), ash_jsonschema::SchemaError>(())
 /// ```
 ///
 /// The result is an [`ObjectBuilder`](crate::ObjectBuilder), not a finished
@@ -36,7 +36,7 @@
 /// needs no `.build()`, exactly as a nested builder does not:
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Schema, object};
+/// # use ash_jsonschema::{Schema, object};
 /// let schema = object! {
 ///     required "user": object! {
 ///         required "id": Schema::string(),
@@ -47,14 +47,14 @@
 /// .build()?;
 ///
 /// assert_eq!(schema.as_object().unwrap().title.as_deref(), Some("Envelope"));
-/// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+/// # Ok::<(), ash_jsonschema::SchemaError>(())
 /// ```
 ///
 /// A property name is usually a literal, but any expression works when wrapped
 /// in parentheses — for names that come from a config or a field list:
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Schema, object};
+/// # use ash_jsonschema::{Schema, object};
 /// let tag = "x-request-id";
 ///
 /// let schema = object! {
@@ -65,7 +65,7 @@
 ///
 /// assert!(schema.requires("x-request-id"));
 /// assert!(schema.property("x-trace").is_some());
-/// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+/// # Ok::<(), ash_jsonschema::SchemaError>(())
 /// ```
 ///
 /// An empty `object!{}` is `{"type": "object"}`, the same as
@@ -113,7 +113,7 @@ macro_rules! object_impl {
 /// block, and leaves the builder otherwise untouched.
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Schema, defs, object};
+/// # use ash_jsonschema::{Schema, defs, object};
 /// let schema = defs! {
 ///     Schema::object().id("https://example.com/order");
 ///
@@ -128,7 +128,7 @@ macro_rules! object_impl {
 ///
 /// assert!(schema.def("Money").is_some());
 /// assert!(schema.def("Sku").is_some());
-/// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+/// # Ok::<(), ash_jsonschema::SchemaError>(())
 /// ```
 ///
 /// The builder comes first, separated by `;`, so the macro reads as *this
@@ -157,7 +157,7 @@ macro_rules! defs_name {
 /// `oneOf`. The shape is entirely mechanical and easy to get subtly wrong.
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Schema, one_of_tagged, object};
+/// # use ash_jsonschema::{Schema, one_of_tagged, object};
 /// let shape = one_of_tagged! {
 ///     "kind";
 ///
@@ -178,7 +178,7 @@ macro_rules! defs_name {
 /// let circle = &branches[0];
 /// assert!(circle.requires("kind"));
 /// assert!(circle.requires("radius"));
-/// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+/// # Ok::<(), ash_jsonschema::SchemaError>(())
 /// ```
 ///
 /// The tag property is added to each variant, so the variant bodies list only

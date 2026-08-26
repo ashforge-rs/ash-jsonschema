@@ -9,7 +9,7 @@
 //! reports.
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Registry, Schema};
+//! # use ash_jsonschema::{Registry, Schema};
 //! let schema = Schema::object()
 //!     .id("https://example.com/user")
 //!     .def("Name", Schema::string().min_length(1))
@@ -177,7 +177,7 @@ impl Registry {
     /// are indexed too, each resolved against the base it appears under.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Registry, Schema};
+    /// # use ash_jsonschema::{Registry, Schema};
     /// let schema = Schema::object().id("https://example.com/a").build()?;
     ///
     /// let mut registry = Registry::new();
@@ -222,7 +222,7 @@ impl Registry {
     /// without paying for it twice.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Registry, Schema};
+    /// # use ash_jsonschema::{Registry, Schema};
     /// # use std::sync::Arc;
     /// let document = Arc::new(Schema::object().id("https://example.com/a").build()?.to_value());
     ///
@@ -349,7 +349,7 @@ impl Registry {
     /// resource is not held, or the fragment names nothing within it.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Registry, Schema};
+    /// # use ash_jsonschema::{Registry, Schema};
     /// let schema = Schema::object()
     ///     .id("https://example.com/s")
     ///     .def("A", Schema::string().anchor("letter-a"))
@@ -449,7 +449,7 @@ impl Registry {
     /// a [`Violation`] located at the `$ref` keyword that wrote it.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Registry, Schema};
+    /// # use ash_jsonschema::{Registry, Schema};
     /// let schema = Schema::object()
     ///     .id("https://example.com/s")
     ///     .property("a", Schema::reference("#/$defs/Nope"))

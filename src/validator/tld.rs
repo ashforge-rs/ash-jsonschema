@@ -17,13 +17,13 @@
 //! that caveat visible.
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Schema, Validator};
+//! # use ash_jsonschema::{Schema, Validator};
 //! let schema = Schema::string().format("hostname").build()?;
 //!
 //! // Registered as a `format`, so the schema stays ordinary JSON.
 //! let validator = Validator::builder(&schema)
 //!     .format("hostname", |value| {
-//!         ash_jsonschema_builder::validator::tld::has_tld_shaped_suffix(value)
+//!         ash_jsonschema::validator::tld::has_tld_shaped_suffix(value)
 //!     })
 //!     .build()?;
 //!
@@ -40,7 +40,7 @@
 /// TLD that breaks them.
 ///
 /// ```
-/// # use ash_jsonschema_builder::validator::tld::is_tld_shaped;
+/// # use ash_jsonschema::validator::tld::is_tld_shaped;
 /// assert!(is_tld_shaped("com"));
 /// assert!(is_tld_shaped("museum"));
 /// assert!(is_tld_shaped("xn--p1ai"));      // рф
@@ -74,7 +74,7 @@ pub fn is_tld_shaped(label: &str) -> bool {
 /// a valid hostname but not a public domain, and this asks the latter.
 ///
 /// ```
-/// # use ash_jsonschema_builder::validator::tld::has_tld_shaped_suffix;
+/// # use ash_jsonschema::validator::tld::has_tld_shaped_suffix;
 /// assert!(has_tld_shaped_suffix("example.com"));
 /// assert!(has_tld_shaped_suffix("a.b.example.co.uk"));
 /// assert!(has_tld_shaped_suffix("example.com."));   // fully qualified
@@ -117,7 +117,7 @@ mod iana {
 /// *Requires the `iana-tlds` feature.*
 ///
 /// ```
-/// # use ash_jsonschema_builder::validator::tld::registered_tlds;
+/// # use ash_jsonschema::validator::tld::registered_tlds;
 /// assert!(registered_tlds().contains(&"com"));
 /// assert!(registered_tlds().len() > 1_000);
 /// ```
@@ -137,7 +137,7 @@ pub fn registered_tlds() -> &'static [&'static str] {
 /// you refresh — or use [`is_tld_shaped`], which never goes stale.
 ///
 /// ```
-/// # use ash_jsonschema_builder::validator::tld::is_registered_tld;
+/// # use ash_jsonschema::validator::tld::is_registered_tld;
 /// assert!(is_registered_tld("com"));
 /// assert!(is_registered_tld("COM"));
 /// assert!(is_registered_tld("museum"));
@@ -157,7 +157,7 @@ pub fn is_registered_tld(label: &str) -> bool {
 /// caveat about the list being a snapshot.
 ///
 /// ```
-/// # use ash_jsonschema_builder::validator::tld::has_registered_tld;
+/// # use ash_jsonschema::validator::tld::has_registered_tld;
 /// assert!(has_registered_tld("example.com"));
 /// assert!(has_registered_tld("a.b.example.co.uk"));
 ///

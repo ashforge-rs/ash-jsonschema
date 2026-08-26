@@ -5,7 +5,7 @@
 //! cargo run --example registry
 //! ```
 
-use ash_jsonschema_builder::{Format, Registry, Schema};
+use ash_jsonschema::{Format, Registry, Schema};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Two documents, each with its own `$id`, one referring to the other.

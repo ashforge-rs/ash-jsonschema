@@ -4,8 +4,8 @@
 //! cargo run --example validate
 //! ```
 
-use ash_jsonschema_builder::validator::Mode;
-use ash_jsonschema_builder::{Format, Schema, object, validator};
+use ash_jsonschema::validator::Mode;
+use ash_jsonschema::{Format, Schema, object, validator};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // The schema is fixed once the validator holds it: there is no way to

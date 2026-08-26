@@ -150,7 +150,7 @@ impl Unit {
     /// The keyword that produced this unit — the last segment of its location.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::validator::Unit;
+    /// # use ash_jsonschema::validator::Unit;
     /// let unit = Unit {
     ///     keyword_location: "/properties/age/minimum".to_owned(),
     ///     ..Unit::default()
@@ -170,7 +170,7 @@ impl Unit {
     /// only to hold the units beneath it.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::validator::Unit;
+    /// # use ash_jsonschema::validator::Unit;
     /// let unit = Unit { error: Some("must be a string".to_owned()), ..Unit::default() };
     /// assert_eq!(unit.message(), "must be a string");
     /// assert_eq!(Unit::default().message(), "");
@@ -353,8 +353,8 @@ impl Outcome {
     /// from, and what it was nested under.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator};
-    /// # use ash_jsonschema_builder::validator::Mode;
+    /// # use ash_jsonschema::{Schema, Validator};
+    /// # use ash_jsonschema::validator::Mode;
     /// let schema = Schema::parse(r#"{
     ///     "anyOf": [{"type": "string"}, {"type": "integer", "minimum": 10}]
     /// }"#)?;
@@ -390,8 +390,8 @@ impl Outcome {
     /// crate.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator};
-    /// # use ash_jsonschema_builder::validator::{Mode, OutputFormat};
+    /// # use ash_jsonschema::{Schema, Validator};
+    /// # use ash_jsonschema::validator::{Mode, OutputFormat};
     /// let schema = Schema::parse(r#"{"type": "string"}"#)?;
     /// let validator = Validator::new(&schema)?;
     /// let outcome = validator.validate(&serde_json::json!(42), Mode::All);
@@ -453,8 +453,8 @@ impl Outcome {
     /// `?` than branch.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator};
-    /// # use ash_jsonschema_builder::validator::Mode;
+    /// # use ash_jsonschema::{Schema, Validator};
+    /// # use ash_jsonschema::validator::Mode;
     /// let validator = Validator::new(&Schema::string().build()?)?;
     ///
     /// validator.validate(&serde_json::json!("ok"), Mode::All).into_result()?;
@@ -474,8 +474,8 @@ impl Outcome {
     /// The errors at, or beneath, one place in the instance.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator, object};
-    /// # use ash_jsonschema_builder::validator::Mode;
+    /// # use ash_jsonschema::{Schema, Validator, object};
+    /// # use ash_jsonschema::validator::Mode;
     /// let schema = object! {
     ///     required "name": Schema::string().min_length(1),
     ///     required "age": Schema::integer().minimum(0),

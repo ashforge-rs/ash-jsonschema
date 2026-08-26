@@ -1,7 +1,7 @@
 //! End-to-end: build documents of the kind a real caller would, and assert on
 //! the exact JSON that comes out.
 
-use ash_jsonschema_builder::{DIALECT, Format, Schema, SchemaType};
+use ash_jsonschema::{DIALECT, Format, Schema, SchemaType};
 
 /// A realistic root document: dialect, identity, reusable `$defs`, a mix of
 /// required and optional properties, and a closed object.

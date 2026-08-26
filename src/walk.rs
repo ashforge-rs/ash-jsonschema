@@ -68,7 +68,7 @@ pub const SUBSCHEMA_MAP: [&str; 4] = [
 /// mistaken for one:
 ///
 /// ```
-/// # use ash_jsonschema_builder::walk::walk_subschemas;
+/// # use ash_jsonschema::walk::walk_subschemas;
 /// let document = serde_json::json!({
 ///     "properties": {
 ///         "not": {"type": "string"}
@@ -88,7 +88,7 @@ pub const SUBSCHEMA_MAP: [&str; 4] = [
 /// A boolean is a schema too, and is visited like any other:
 ///
 /// ```
-/// # use ash_jsonschema_builder::walk::walk_subschemas;
+/// # use ash_jsonschema::walk::walk_subschemas;
 /// let document = serde_json::json!({"items": true});
 ///
 /// let mut seen = Vec::new();

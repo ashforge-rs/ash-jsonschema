@@ -1,4 +1,4 @@
-# ash-jsonschema-builder
+# ash-jsonschema
 
 **Chain the keywords, call `.build()`, get a schema.**
 
@@ -8,7 +8,7 @@ emits, so there is no draft selector to thread through the API and no keyword
 that means one thing here and another there.
 
 ```rust
-use ash_jsonschema_builder::{Format, Schema};
+use ash_jsonschema::{Format, Schema};
 
 let schema = Schema::object()
     .dialect()
@@ -535,7 +535,7 @@ opt-in with the caveat stated.
 | `iana-tlds` | off | The vendored IANA root zone, for `is_registered_tld` |
 
 ```toml
-ash-jsonschema-builder = { version = "0.1", default-features = false }
+ash-jsonschema = { version = "0.1", default-features = false }
 ```
 
 Building, reading, resolving, diffing, and bundling all work without it. No

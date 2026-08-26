@@ -5,9 +5,9 @@
 //! cargo run --example evolve
 //! ```
 
-use ash_jsonschema_builder::bundle::bundle;
-use ash_jsonschema_builder::diff::{Role, diff};
-use ash_jsonschema_builder::{Format, Registry, Schema};
+use ash_jsonschema::bundle::bundle;
+use ash_jsonschema::diff::{Role, diff};
+use ash_jsonschema::{Format, Registry, Schema};
 
 /// The `user` schema as it stood, and as it is proposed.
 fn user(version: u8) -> Schema {

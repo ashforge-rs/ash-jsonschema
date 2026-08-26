@@ -1,7 +1,7 @@
 //! Comparing schema versions, and following references while doing it.
 
-use ash_jsonschema_builder::diff::{ChangeKind, Effect, Role, diff, diff_resolved};
-use ash_jsonschema_builder::{Registry, Schema};
+use ash_jsonschema::diff::{ChangeKind, Effect, Role, diff, diff_resolved};
+use ash_jsonschema::{Registry, Schema};
 
 /// Two versions of one document, each in its own registry — the shape a real
 /// compatibility gate has.

@@ -3,7 +3,7 @@
 version = 4
 
 [[package]]
-name = "ash-jsonschema-builder"
+name = "ash-jsonschema"
 version = "0.1.0"
 dependencies = [
  "regex-lite",

@@ -29,7 +29,7 @@ impl Builder<kind::Array> {
     /// Appends several schemas to `prefixItems`.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// // A latitude/longitude pair, and nothing else.
     /// let schema = Schema::array()
     ///     .prefix_items([Schema::number().range(-90, 90), Schema::number().range(-180, 180)])

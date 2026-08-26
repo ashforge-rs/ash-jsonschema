@@ -5,8 +5,8 @@
 //! tests are a conformance bar rather than a description of current
 //! behaviour.
 
-use ash_jsonschema_builder::validator::{Mode, OutputFormat};
-use ash_jsonschema_builder::{Schema, Validator};
+use ash_jsonschema::validator::{Mode, OutputFormat};
+use ash_jsonschema::{Schema, Validator};
 use serde_json::json;
 
 fn validator(source: &str) -> Validator {

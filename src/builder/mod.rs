@@ -11,7 +11,7 @@
 //! chain reads as one expression and `.build()` ends it.
 //!
 //! ```
-//! # use ash_jsonschema_builder::Schema;
+//! # use ash_jsonschema::Schema;
 //! let schema = Schema::array()
 //!     .description("A non-empty set of tags")
 //!     .items(Schema::string().min_length(1))
@@ -106,7 +106,7 @@ impl<K> Builder<K> {
     /// broke; see [`SchemaError`].
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// // `$anchor` must be a plain name, and the meta-schema says so.
     /// let error = Schema::object()
     ///     .property("inner", Schema::string().anchor("not a valid anchor"))
@@ -143,7 +143,7 @@ impl<K> Builder<K> {
     /// like, and immune to being edited out from under any of them.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object()
     ///     .required_property("id", Schema::string().format("uuid"))
     ///     .build_frozen()?;
@@ -154,7 +154,7 @@ impl<K> Builder<K> {
     /// // Cloning shares the one schema rather than copying it.
     /// let shared = schema.clone();
     /// assert!(schema.is_same_as(&shared));
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     ///
     /// [`FrozenSchema::thaw`] clones a mutable copy back out, leaving the
@@ -180,7 +180,7 @@ impl<K> Builder<K> {
     /// copy instead, for a base that several schemas branch from:
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let base = Schema::object()
     ///     .required_property("id", Schema::string())
     ///     .description("Every record carries an id.");
@@ -192,7 +192,7 @@ impl<K> Builder<K> {
     /// assert!(common.requires("id"));
     /// assert!(!common.requires("name"));
     /// assert!(full.requires("name"));
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     ///
     /// The copy is not checked against the meta-schema — a chain in progress is
@@ -215,14 +215,14 @@ impl<K> Builder<K> {
     /// value is written verbatim and rendered after every dialect keyword.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object()
     ///     .property("kind", Schema::string())
     ///     .keyword("discriminator", serde_json::json!({"propertyName": "kind"}))
     ///     .build()?;
     ///
     /// assert!(schema.to_json().contains(r#""discriminator":{"propertyName":"kind"}"#));
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     ///
     /// # Panics
@@ -397,7 +397,7 @@ impl<K> Builder<K> {
     /// Sets `enum` — the instance must equal one of these values.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::string().enumeration(["red", "green", "blue"]).build().unwrap();
     /// assert_eq!(schema.to_json(), r#"{"type":"string","enum":["red","green","blue"]}"#);
     /// ```
@@ -412,7 +412,7 @@ impl<K> Builder<K> {
     /// `anyOf`, so the sibling assertions keep applying to the non-null case.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::string().min_length(1).nullable().build().unwrap();
     /// assert_eq!(schema.to_json(), r#"{"type":["string","null"],"minLength":1}"#);
     /// ```
@@ -488,7 +488,7 @@ impl<K> Builder<K> {
     /// Sets `if`, `then`, and `else` together.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object()
     ///     .property("kind", Schema::string())
     ///     .if_then_else(
@@ -527,13 +527,13 @@ impl SchemaObject {
     /// when you know.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let parsed = Schema::parse(r#"{"type":"string","minLength":1}"#).unwrap();
     /// let object = parsed.as_object().unwrap().clone();
     ///
     /// let extended = object.into_builder().title("Name").build()?;
     /// assert_eq!(extended.to_json(), r#"{"title":"Name","type":"string","minLength":1}"#);
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn into_builder(self) -> AnyBuilder {
         Builder {
@@ -550,7 +550,7 @@ impl SchemaObject {
     /// validator will ignore rather than a compile error.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, StringBuilder};
+    /// # use ash_jsonschema::{Schema, StringBuilder};
     /// let parsed = Schema::parse(r#"{"type":"string"}"#).unwrap();
     /// let object = parsed.as_object().unwrap().clone();
     ///
@@ -559,7 +559,7 @@ impl SchemaObject {
     ///     tightened.max_length(64).build()?.to_json(),
     ///     r#"{"type":"string","maxLength":64}"#,
     /// );
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn into_typed<K>(self) -> Builder<K> {
         Builder {
@@ -576,13 +576,13 @@ impl Schema {
     /// as an empty builder — the boolean-ness is not preserved.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let base = Schema::parse(r#"{"type":"object","properties":{"id":{"type":"string"}}}"#)
     ///     .unwrap();
     ///
     /// let described = base.into_builder().description("A record").build()?;
     /// assert!(described.to_json().contains(r#""description":"A record""#));
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn into_builder(self) -> AnyBuilder {
         self.into_schema_object().into_builder()

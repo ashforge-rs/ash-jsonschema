@@ -47,7 +47,7 @@ const URI_PREFIX: &str = "https://json-schema.org/draft/2020-12/";
 /// a well-formed schema before working with it.
 ///
 /// ```
-/// # use ash_jsonschema_builder::validate_document;
+/// # use ash_jsonschema::validate_document;
 /// let good = serde_json::json!({"type": "string", "minLength": 1});
 /// assert!(validate_document(&good).is_ok());
 ///

@@ -4,7 +4,7 @@
 //! replaces would be worse than no macro at all, so these compare the two
 //! directly rather than asserting on the result in isolation.
 
-use ash_jsonschema_builder::{Format, Schema, defs, object, one_of_tagged};
+use ash_jsonschema::{Format, Schema, defs, object, one_of_tagged};
 
 /// The shape the `order` example builds, written both ways.
 #[test]
@@ -127,8 +127,8 @@ fn macro_output_is_valid_2020_12() {
 /// diffs like any other.
 #[test]
 fn a_macro_written_schema_works_with_the_rest_of_the_crate() {
-    use ash_jsonschema_builder::diff::{Role, diff};
-    use ash_jsonschema_builder::Registry;
+    use ash_jsonschema::diff::{Role, diff};
+    use ash_jsonschema::Registry;
 
     let v1 = object! {
         required "id": Schema::string(),

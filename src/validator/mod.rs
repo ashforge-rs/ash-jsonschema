@@ -5,8 +5,8 @@
 //! particular piece of JSON satisfy it?
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Schema, Validator, object};
-//! # use ash_jsonschema_builder::validator::Mode;
+//! # use ash_jsonschema::{Schema, Validator, object};
+//! # use ash_jsonschema::validator::Mode;
 //! let schema = object! {
 //!     required "id": Schema::string().min_length(1),
 //!     required "age": Schema::integer().minimum(0),
@@ -82,7 +82,7 @@ use formats::Formats;
 /// you like.
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Schema, Validator};
+/// # use ash_jsonschema::{Schema, Validator};
 /// let validator = Validator::new(&Schema::string().min_length(2).build()?)?;
 ///
 /// assert!(validator.is_valid(&serde_json::json!("ok")));
@@ -117,7 +117,7 @@ impl Validator {
     /// not borrowed afterwards — the validator stands alone once built.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Registry, Schema, Validator};
+    /// # use ash_jsonschema::{Registry, Schema, Validator};
     /// let address = Schema::object()
     ///     .id("https://example.com/address")
     ///     .required_property("city", Schema::string())
@@ -154,7 +154,7 @@ impl Validator {
     /// assert, or one of your own.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator};
+    /// # use ash_jsonschema::{Schema, Validator};
     /// let schema = Schema::string().format("employee-id").build()?;
     ///
     /// let validator = Validator::builder(&schema)
@@ -183,8 +183,8 @@ impl Validator {
     /// Checks `instance`, reporting according to `mode`.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator, object};
-    /// # use ash_jsonschema_builder::validator::Mode;
+    /// # use ash_jsonschema::{Schema, Validator, object};
+    /// # use ash_jsonschema::validator::Mode;
     /// let schema = object! {
     ///     required "a": Schema::string(),
     ///     required "b": Schema::string(),
@@ -214,8 +214,8 @@ impl Validator {
     /// that does not exist.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator};
-    /// # use ash_jsonschema_builder::validator::Mode;
+    /// # use ash_jsonschema::{Schema, Validator};
+    /// # use ash_jsonschema::validator::Mode;
     /// let schema = Schema::parse(r#"{
     ///     "properties": {
     ///         "id": {"type": "string", "title": "Identifier", "readOnly": true}
@@ -259,7 +259,7 @@ impl Validator {
     /// Checks a value that serializes to JSON.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator, object};
+    /// # use ash_jsonschema::{Schema, Validator, object};
     /// # use serde::Serialize;
     /// #[derive(Serialize)]
     /// struct User { id: String, age: u8 }
@@ -343,7 +343,7 @@ impl ValidatorBuilder {
     /// annotation.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator};
+    /// # use ash_jsonschema::{Schema, Validator};
     /// let schema = Schema::string().format("date").build()?;
     /// let validator = Validator::builder(&schema).assert_formats().build()?;
     ///
@@ -368,9 +368,9 @@ impl ValidatorBuilder {
     /// string instances — `format` says nothing about any other type.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, Validator};
+    /// # use ash_jsonschema::{Schema, Validator};
     /// # #[cfg(feature = "iana-tlds")] {
-    /// # use ash_jsonschema_builder::validator::tld::has_registered_tld;
+    /// # use ash_jsonschema::validator::tld::has_registered_tld;
     /// let schema = Schema::string().format("hostname").build().unwrap();
     ///
     /// let validator = Validator::builder(&schema)
@@ -412,7 +412,7 @@ impl ValidatorBuilder {
 /// to validate against something else, write another one.
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Schema, validator, object};
+/// # use ash_jsonschema::{Schema, validator, object};
 /// let user = validator! {
 ///     object! {
 ///         required "id": Schema::string().min_length(1),
@@ -430,7 +430,7 @@ impl ValidatorBuilder {
 /// separated by `;` — the same order [`defs!`](crate::defs) uses:
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Registry, Schema, validator};
+/// # use ash_jsonschema::{Registry, Schema, validator};
 /// # let address = Schema::object().id("https://example.com/address")
 /// #     .required_property("city", Schema::string()).build()?;
 /// # let user = Schema::object().id("https://example.com/user")

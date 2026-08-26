@@ -2,8 +2,8 @@
 
 use std::sync::Arc;
 
-use ash_jsonschema_builder::registry::ANONYMOUS;
-use ash_jsonschema_builder::{ErrorKind, Registry, RegistryError, Schema};
+use ash_jsonschema::registry::ANONYMOUS;
+use ash_jsonschema::{ErrorKind, Registry, RegistryError, Schema};
 
 /// The everyday case: a `$ref` into the document's own `$defs`.
 #[test]

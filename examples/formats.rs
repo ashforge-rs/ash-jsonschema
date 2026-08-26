@@ -5,9 +5,9 @@
 //! cargo run --example formats --features iana-tlds
 //! ```
 
-use ash_jsonschema_builder::validator::Mode;
-use ash_jsonschema_builder::validator::tld::has_tld_shaped_suffix;
-use ash_jsonschema_builder::{Schema, Validator, object};
+use ash_jsonschema::validator::Mode;
+use ash_jsonschema::validator::tld::has_tld_shaped_suffix;
+use ash_jsonschema::{Schema, Validator, object};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let schema = object! {
@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     #[cfg(feature = "iana-tlds")]
     {
-        use ash_jsonschema_builder::validator::tld::{has_registered_tld, registered_tlds};
+        use ash_jsonschema::validator::tld::{has_registered_tld, registered_tlds};
 
         println!(
             "\nwith `iana-tlds`: {} delegated TLDs are known",

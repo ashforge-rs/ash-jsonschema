@@ -1,5 +1,5 @@
 [package]
-name = "ash-jsonschema-builder"
+name = "ash-jsonschema"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
@@ -8,7 +8,7 @@ description = "A typed builder for JSON Schema 2020-12 — chain the keywords, c
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/ashforge-rs/ash-jsonschema"
-documentation = "https://docs.rs/ash-jsonschema-builder"
+documentation = "https://docs.rs/ash-jsonschema"
 keywords = ["jsonschema", "json-schema", "builder", "schema", "validation"]
 categories = ["data-structures", "encoding", "rust-patterns"]
 

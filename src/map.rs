@@ -17,7 +17,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 /// key at its original position, and returns the previous value.
 ///
 /// ```
-/// # use ash_jsonschema_builder::OrderedMap;
+/// # use ash_jsonschema::OrderedMap;
 /// let mut map = OrderedMap::new();
 /// map.insert("b", 1);
 /// map.insert("a", 2);

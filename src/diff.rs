@@ -12,7 +12,7 @@
 //! on each, and the caller asks the question it actually has:
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Schema, diff::{diff, Role}};
+//! # use ash_jsonschema::{Schema, diff::{diff, Role}};
 //! let v1 = Schema::object()
 //!     .required_property("id", Schema::string())
 //!     .build()?;
@@ -28,7 +28,7 @@
 //! assert!(report.is_breaking_for(Role::Writer));
 //! // A reader built for v1 simply ignores the new field.
 //! assert!(!report.is_breaking_for(Role::Reader));
-//! # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+//! # Ok::<(), ash_jsonschema::SchemaError>(())
 //! ```
 //!
 //! ## What a diff can and cannot know
@@ -303,14 +303,14 @@ impl Report {
     /// [`Effect::Unknown`] counts as breaking — see [`Effect::is_breaking`].
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Schema, diff::{diff, Role}};
+    /// # use ash_jsonschema::{Schema, diff::{diff, Role}};
     /// let v1 = Schema::object().property("a", Schema::string()).build()?;
     /// let v2 = Schema::object().build()?;
     ///
     /// let report = diff(&v1, &v2);
     /// assert!(report.is_breaking_for(Role::Reader));   // `a` is gone
     /// assert!(!report.is_breaking_for(Role::Writer));  // sending less is fine
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn is_breaking_for(&self, role: Role) -> bool {
         self.changes
@@ -350,14 +350,14 @@ impl std::fmt::Display for Report {
 /// not followed. Use [`diff_resolved`] to compare through a registry instead.
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Schema, diff::diff};
+/// # use ash_jsonschema::{Schema, diff::diff};
 /// let v1 = Schema::object().property("age", Schema::integer().minimum(0)).build()?;
 /// let v2 = Schema::object().property("age", Schema::integer().minimum(18)).build()?;
 ///
 /// let report = diff(&v1, &v2);
 /// assert_eq!(report.changes.len(), 1);
 /// assert_eq!(report.changes[0].location, "/properties/age");
-/// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+/// # Ok::<(), ash_jsonschema::SchemaError>(())
 /// ```
 pub fn diff(before: &Schema, after: &Schema) -> Report {
     let mut differ = Differ {
@@ -386,7 +386,7 @@ pub fn diff(before: &Schema, after: &Schema) -> Report {
 /// documents genuinely did not change.
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Registry, Schema, diff::{diff_resolved, Role}};
+/// # use ash_jsonschema::{Registry, Schema, diff::{diff_resolved, Role}};
 /// let version = |length: u64| {
 ///     Schema::object()
 ///         .id("https://example.com/s")

@@ -39,7 +39,7 @@ impl Builder<kind::Object> {
     /// Adds one entry to `properties` **and** its name to `required`.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object().required_property("id", Schema::integer()).build().unwrap();
     /// assert_eq!(
     ///     schema.to_json(),
@@ -54,13 +54,13 @@ impl Builder<kind::Object> {
     /// Adds several entries to `properties`, marking every one required.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object()
     ///     .required_properties([("id", Schema::string()), ("email", Schema::string())])
     ///     .build()?;
     ///
     /// assert_eq!(schema.as_object().unwrap().required.as_ref().unwrap(), &["id", "email"]);
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn required_properties<N, S>(self, properties: impl IntoIterator<Item = (N, S)>) -> Self
     where
@@ -76,14 +76,14 @@ impl Builder<kind::Object> {
     /// true — for a field whose optionality is decided at run time.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// # let mandatory = false;
     /// let schema = Schema::object()
     ///     .property_maybe_required("nickname", Schema::string(), mandatory)
     ///     .build()?;
     ///
     /// assert_eq!(schema.as_object().unwrap().required, None);
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn property_maybe_required(
         self,
@@ -104,12 +104,12 @@ impl Builder<kind::Object> {
     /// close an object mean.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// assert_eq!(
     ///     Schema::object().closed().build()?.to_json(),
     ///     r#"{"type":"object","additionalProperties":false}"#,
     /// );
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn closed(self) -> Self {
         self.additional_properties(false)

@@ -1,4 +1,4 @@
-//! # ash-jsonschema-builder
+//! # ash-jsonschema
 //!
 //! **Chain the keywords, call `.build()`, get a schema.**
 //!
@@ -8,7 +8,7 @@
 //! and another there.
 //!
 //! ```
-//! use ash_jsonschema_builder::{Format, Schema, SchemaError};
+//! use ash_jsonschema::{Format, Schema, SchemaError};
 //!
 //! # fn main() -> Result<(), SchemaError> {
 //! let schema = Schema::object()
@@ -54,7 +54,7 @@
 //! and so does a bare `bool`, since `true` and `false` are themselves schemas:
 //!
 //! ```
-//! # use ash_jsonschema_builder::Schema;
+//! # use ash_jsonschema::Schema;
 //! let schema = Schema::object()
 //!     .property("nested", Schema::object().additional_properties(false))
 //!     .property("anything", true)
@@ -76,7 +76,7 @@
 //! JSON Pointer of the offending subschema and the meta-schema rule it broke:
 //!
 //! ```
-//! # use ash_jsonschema_builder::Schema;
+//! # use ash_jsonschema::Schema;
 //! let error = Schema::object()
 //!     .property("inner", Schema::string().anchor("not a valid anchor"))
 //!     .build()
@@ -98,7 +98,7 @@
 //! [`keyword`](Builder::keyword) writes one from the builder side.
 //!
 //! ```
-//! # use ash_jsonschema_builder::Schema;
+//! # use ash_jsonschema::Schema;
 //! let schema = Schema::parse(r#"{"type":"object","properties":{"id":{"type":"string"}}}"#)
 //!     .unwrap();
 //!
@@ -127,7 +127,7 @@
 //! within one.
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Registry, Schema};
+//! # use ash_jsonschema::{Registry, Schema};
 //! let address = Schema::object()
 //!     .id("https://example.com/schemas/address")
 //!     .required_property("city", Schema::string())
@@ -157,7 +157,7 @@
 //! those two in opposite directions:
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Schema, diff::{diff, Role}};
+//! # use ash_jsonschema::{Schema, diff::{diff, Role}};
 //! let v1 = Schema::object().required_property("id", Schema::string()).build()?;
 //! let v2 = Schema::object()
 //!     .required_property("id", Schema::string())
@@ -167,7 +167,7 @@
 //! let report = diff(&v1, &v2);
 //! assert!(report.is_breaking_for(Role::Writer));
 //! assert!(!report.is_breaking_for(Role::Reader));
-//! # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+//! # Ok::<(), ash_jsonschema::SchemaError>(())
 //! ```
 //!
 //! [`bundle()`] collapses a set of schemas into one self-contained document,
@@ -180,7 +180,7 @@
 //! duplication object schemas otherwise force — and yields an ordinary builder:
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Schema, object};
+//! # use ash_jsonschema::{Schema, object};
 //! let user = object! {
 //!     required "id": Schema::string().format("uuid"),
 //!     "age": Schema::integer().minimum(0),
@@ -189,7 +189,7 @@
 //! .build()?;
 //!
 //! assert!(user.requires("id"));
-//! # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+//! # Ok::<(), ash_jsonschema::SchemaError>(())
 //! ```
 //!
 //! [`defs!`] takes a block of definitions; [`one_of_tagged!`] writes the tagged
@@ -212,8 +212,8 @@
     feature = "validation",
     doc = r#"
 ```
-# use ash_jsonschema_builder::{Schema, Validator, object};
-# use ash_jsonschema_builder::validator::Mode;
+# use ash_jsonschema::{Schema, Validator, object};
+# use ash_jsonschema::validator::Mode;
 let validator = Validator::new(&object! {
     required "id": Schema::string().min_length(1),
 }.build()?)?;
@@ -334,7 +334,7 @@ pub use validator::{
 /// The types a typical caller wants in scope.
 ///
 /// ```
-/// use ash_jsonschema_builder::prelude::*;
+/// use ash_jsonschema::prelude::*;
 ///
 /// let schema = Schema::object().property("name", Schema::string()).build().unwrap();
 /// ```

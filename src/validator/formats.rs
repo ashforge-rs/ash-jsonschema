@@ -8,7 +8,7 @@
 //! Turning assertion on is therefore explicit, and per name:
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Schema, Validator};
+//! # use ash_jsonschema::{Schema, Validator};
 //! let schema = Schema::string().format("date").build()?;
 //!
 //! // Annotation by default: nothing is asserted.
@@ -28,7 +28,7 @@
 //! asserts:
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Schema, Validator};
+//! # use ash_jsonschema::{Schema, Validator};
 //! let schema = Schema::string().format("employee-id").build()?;
 //!
 //! let validator = Validator::builder(&schema)

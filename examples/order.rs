@@ -4,7 +4,7 @@
 //! cargo run --example order
 //! ```
 
-use ash_jsonschema_builder::{Format, Schema, SchemaError};
+use ash_jsonschema::{Format, Schema, SchemaError};
 
 fn main() -> Result<(), SchemaError> {
     let money = Schema::object()

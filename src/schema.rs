@@ -30,7 +30,7 @@ pub const DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
 /// was built from.
 ///
 /// ```
-/// # use ash_jsonschema_builder::Num;
+/// # use ash_jsonschema::Num;
 /// assert_eq!(serde_json::to_string(&Num::from(3)).unwrap(), "3");
 /// assert_eq!(serde_json::to_string(&Num::from(2.5)).unwrap(), "2.5");
 /// ```
@@ -149,7 +149,7 @@ impl SchemaType {
     /// when a `Result` suits the caller better than an `Option`.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::SchemaType;
+    /// # use ash_jsonschema::SchemaType;
     /// assert_eq!(SchemaType::parse("integer"), Some(SchemaType::Integer));
     /// assert_eq!(SchemaType::parse("Integer"), None);
     ///
@@ -376,7 +376,7 @@ pub const DIALECT_KEYWORDS: [&str; 57] = [
 /// field rather than belonging in [`SchemaObject::extensions`].
 ///
 /// ```
-/// # use ash_jsonschema_builder::schema::is_dialect_keyword;
+/// # use ash_jsonschema::schema::is_dialect_keyword;
 /// assert!(is_dialect_keyword("minLength"));
 /// assert!(!is_dialect_keyword("x-internal"));
 /// ```
@@ -738,7 +738,7 @@ fn count<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<u64>, D::E
 /// Build one with the entry points below, then call `.build()`:
 ///
 /// ```
-/// # use ash_jsonschema_builder::Schema;
+/// # use ash_jsonschema::Schema;
 /// let schema = Schema::object()
 ///     .dialect()
 ///     .required_property("id", Schema::string().format("uuid"))
@@ -815,7 +815,7 @@ impl Schema {
     /// A builder for a lone `$ref`.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::reference("#/$defs/Address").build().unwrap();
     /// assert_eq!(schema.to_json(), r##"{"$ref":"#/$defs/Address"}"##);
     /// ```
@@ -865,7 +865,7 @@ impl Schema {
     /// parsed and rendered back out keeps everything it arrived with.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::parse(r#"{"type":"string","minLength":1}"#)?;
     /// assert_eq!(schema.as_object().unwrap().min_length, Some(1));
     /// # Ok::<(), serde_json::Error>(())
@@ -881,7 +881,7 @@ impl Schema {
     /// not a well-formed 2020-12 schema.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::parse_checked(r#"{"type":"string"}"#).unwrap();
     /// assert!(schema.as_object().is_some());
     ///
@@ -933,12 +933,12 @@ impl Schema {
     /// The subschema under `properties` for `name`, if any.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object().property("id", Schema::string()).build()?;
     /// assert_eq!(schema.property("id").and_then(Schema::as_bool), None);
     /// assert!(schema.property("id").is_some());
     /// assert!(schema.property("missing").is_none());
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn property(&self, name: &str) -> Option<&Schema> {
         self.as_object()?.properties.as_ref()?.get(name)
@@ -969,14 +969,14 @@ impl Schema {
     /// [`serde_json::Value::pointer`] on it.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object()
     ///     .property("id", Schema::string().min_length(1))
     ///     .build()?;
     ///
     /// assert_eq!(schema.pointer("/properties/id/minLength"), Some(serde_json::json!(1)));
     /// assert_eq!(schema.pointer("/properties/nope"), None);
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn pointer(&self, pointer: &str) -> Option<Value> {
         self.to_value().pointer(pointer).cloned()
@@ -992,7 +992,7 @@ impl Schema {
     /// in place and a violation carries the JSON Pointer that locates it.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::string().min_length(1).build_unchecked();
     /// assert!(schema.validate().is_ok());
     /// ```
@@ -1009,7 +1009,7 @@ impl Schema {
     /// wants a copy out need not know which it has.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object().title("Original").build()?;
     ///
     /// let mut copy = schema.export();
@@ -1017,7 +1017,7 @@ impl Schema {
     ///
     /// assert_eq!(copy.as_object().unwrap().title.as_deref(), Some("Mine"));
     /// assert_eq!(schema.as_object().unwrap().title.as_deref(), Some("Original"));
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn export(&self) -> Schema {
         self.clone()
@@ -1035,7 +1035,7 @@ impl Schema {
     /// not a schema — `/properties` is a map of subschemas, not one itself.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::object()
     ///     .property("address", Schema::object().required(["city"]))
     ///     .build()?;
@@ -1045,7 +1045,7 @@ impl Schema {
     ///
     /// assert!(schema.export_at("/properties/missing").is_none());
     /// assert!(schema.export_at("/properties").is_none());  // a map, not a schema
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn export_at(&self, pointer: &str) -> Option<Schema> {
         if pointer.is_empty() {
@@ -1071,7 +1071,7 @@ impl Schema {
     /// already hold.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let frozen = Schema::string().build_unchecked().freeze();
     /// assert_eq!(frozen.to_json(), r#"{"type":"string"}"#);
     /// ```

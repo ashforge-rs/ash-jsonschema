@@ -1,7 +1,7 @@
 //! Asserting `format`, with the built-ins and with rules of your own.
 
-use ash_jsonschema_builder::validator::Mode;
-use ash_jsonschema_builder::{Schema, Validator, object};
+use ash_jsonschema::validator::Mode;
+use ash_jsonschema::{Schema, Validator, object};
 
 /// The default is the specification's: `format` annotates and asserts nothing.
 #[test]
@@ -163,7 +163,7 @@ fn a_validator_with_rules_is_still_shareable() {
 /// Structural TLD rules need no list and never go stale.
 #[test]
 fn a_tld_can_be_checked_structurally() {
-    use ash_jsonschema_builder::validator::tld::has_tld_shaped_suffix;
+    use ash_jsonschema::validator::tld::has_tld_shaped_suffix;
 
     let schema = Schema::string().format("hostname").build().unwrap();
     let validator = Validator::builder(&schema)
@@ -181,7 +181,7 @@ fn a_tld_can_be_checked_structurally() {
 #[cfg(feature = "iana-tlds")]
 #[test]
 fn a_tld_can_be_checked_against_the_iana_list() {
-    use ash_jsonschema_builder::validator::tld::has_registered_tld;
+    use ash_jsonschema::validator::tld::has_registered_tld;
 
     let schema = object! {
         required "site": Schema::string().format("hostname"),
@@ -204,7 +204,7 @@ fn a_tld_can_be_checked_against_the_iana_list() {
 #[cfg(feature = "iana-tlds")]
 #[test]
 fn the_structural_rule_is_looser_than_the_list() {
-    use ash_jsonschema_builder::validator::tld::{has_registered_tld, has_tld_shaped_suffix};
+    use ash_jsonschema::validator::tld::{has_registered_tld, has_tld_shaped_suffix};
 
     // `.zzz` is shaped like a TLD and is not one. A build whose vendored list
     // has gone stale would wrongly reject a real domain the same way, which is

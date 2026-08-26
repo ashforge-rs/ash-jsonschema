@@ -28,7 +28,7 @@ use crate::schema::Schema;
 /// Reading works exactly as it does on a `Schema`, through `Deref`:
 ///
 /// ```
-/// # use ash_jsonschema_builder::Schema;
+/// # use ash_jsonschema::Schema;
 /// let frozen = Schema::object()
 ///     .required_property("id", Schema::string())
 ///     .build_frozen()
@@ -41,7 +41,7 @@ use crate::schema::Schema;
 /// Writing does not. This compiles:
 ///
 /// ```
-/// # use ash_jsonschema_builder::Schema;
+/// # use ash_jsonschema::Schema;
 /// let mut schema = Schema::string().build().unwrap();
 /// if let Schema::Object(object) = &mut schema {
 ///     object.title = Some("changed".into());
@@ -51,7 +51,7 @@ use crate::schema::Schema;
 /// and the same thing through a `FrozenSchema` does not:
 ///
 /// ```compile_fail
-/// # use ash_jsonschema_builder::Schema;
+/// # use ash_jsonschema::Schema;
 /// let mut frozen = Schema::string().build_frozen().unwrap();
 /// if let Schema::Object(object) = &mut *frozen {
 ///     object.title = Some("changed".into());
@@ -85,7 +85,7 @@ impl FrozenSchema {
     /// happens to start out identical.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let frozen = Schema::string().build_frozen().unwrap();
     ///
     /// let mut thawed = frozen.thaw();
@@ -107,14 +107,14 @@ impl FrozenSchema {
     /// whether it holds a [`Schema`], a `FrozenSchema`, or a builder.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let frozen = Schema::string().title("Shared").build_frozen()?;
     ///
     /// let mut mine = frozen.export();
     /// mine.as_object_mut().unwrap().title = Some("Mine".into());
     ///
     /// assert_eq!(frozen.as_object().unwrap().title.as_deref(), Some("Shared"));
-    /// # Ok::<(), ash_jsonschema_builder::SchemaError>(())
+    /// # Ok::<(), ash_jsonschema::SchemaError>(())
     /// ```
     pub fn export(&self) -> Schema {
         self.thaw()
@@ -130,7 +130,7 @@ impl FrozenSchema {
     /// equal copies of two.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let frozen = Schema::string().build_frozen().unwrap();
     /// let shared = frozen.clone();
     /// let separate = Schema::string().build_frozen().unwrap();

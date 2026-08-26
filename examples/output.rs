@@ -4,8 +4,8 @@
 //! cargo run --example output
 //! ```
 
-use ash_jsonschema_builder::validator::{Mode, OutputFormat};
-use ash_jsonschema_builder::{Schema, Validator};
+use ash_jsonschema::validator::{Mode, OutputFormat};
+use ash_jsonschema::{Schema, Validator};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // An `anyOf` is the case that makes the difference between the formats

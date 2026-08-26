@@ -6,7 +6,7 @@
 //! everything it references, so it can be handed over as one file.
 //!
 //! ```
-//! # use ash_jsonschema_builder::{Registry, Schema, bundle::bundle};
+//! # use ash_jsonschema::{Registry, Schema, bundle::bundle};
 //! let address = Schema::object()
 //!     .id("https://example.com/address")
 //!     .required_property("city", Schema::string())
@@ -147,7 +147,7 @@ fn embed_name(uri: &str, taken: &BTreeMap<String, String>) -> String {
 /// alongside them.
 ///
 /// ```
-/// # use ash_jsonschema_builder::{Registry, Schema, bundle::bundle};
+/// # use ash_jsonschema::{Registry, Schema, bundle::bundle};
 /// # let address = Schema::object().id("https://example.com/address").build().unwrap();
 /// # let user = Schema::object()
 /// #     .id("https://example.com/user")

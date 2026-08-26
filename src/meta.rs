@@ -78,7 +78,7 @@ impl MetaSchema {
     /// The dialect, parsed on first call and reused thereafter.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::meta::MetaSchema;
+    /// # use ash_jsonschema::meta::MetaSchema;
     /// let meta = MetaSchema::current();
     /// assert!(meta.root().is_object());
     /// ```
@@ -267,7 +267,7 @@ fn unescape_pointer_token(token: &str) -> String {
 /// something absent, or if a token indexes into a scalar.
 ///
 /// ```
-/// # use ash_jsonschema_builder::meta::resolve_pointer;
+/// # use ash_jsonschema::meta::resolve_pointer;
 /// let document = serde_json::json!({"properties": {"id": {"type": "string"}}});
 ///
 /// assert_eq!(

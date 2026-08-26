@@ -37,7 +37,7 @@ impl Builder<kind::Str> {
     /// becomes [`Format::Custom`].
     ///
     /// ```
-    /// # use ash_jsonschema_builder::{Format, Schema};
+    /// # use ash_jsonschema::{Format, Schema};
     /// assert_eq!(
     ///     Schema::string().format(Format::DateTime).build().unwrap(),
     ///     Schema::string().format("date-time").build().unwrap(),

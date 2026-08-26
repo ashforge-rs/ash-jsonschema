@@ -39,7 +39,7 @@ impl Builder<kind::Numeric> {
     /// Sets `minimum` and `maximum` together, both inclusive.
     ///
     /// ```
-    /// # use ash_jsonschema_builder::Schema;
+    /// # use ash_jsonschema::Schema;
     /// let schema = Schema::integer().range(1, 10).build().unwrap();
     /// assert_eq!(schema.to_json(), r#"{"type":"integer","maximum":10,"minimum":1}"#);
     /// ```
