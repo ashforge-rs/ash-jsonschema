@@ -580,4 +580,4 @@ cargo run --example order
 
 ## License
 
-Apache-2.0.
+Apache-2.0. See [LICENSE](LICENSE).
