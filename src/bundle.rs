@@ -58,6 +58,7 @@ use crate::walk::walk_subschemas;
 
 /// A bundle that could not be produced.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BundleError {
     /// The root URI names no resource in the registry.
     UnknownRoot {

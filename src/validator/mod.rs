@@ -308,6 +308,7 @@ impl Validator {
 /// Obtained from [`Validator::builder`]. Every method returns the builder, so
 /// the whole thing reads as one chain ending in
 /// [`build`](ValidatorBuilder::build).
+#[derive(Clone, Debug)]
 pub struct ValidatorBuilder {
     document: Arc<Value>,
     registry: Option<Registry>,

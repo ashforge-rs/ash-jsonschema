@@ -50,6 +50,7 @@ pub struct SchemaError {
 
 /// Which check produced a [`SchemaError`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ErrorKind {
     /// The document is not a well-formed JSON Schema 2020-12.
     MetaSchema,
@@ -131,6 +132,7 @@ impl std::error::Error for SchemaError {}
 /// [`Invalid`](ParseError::Invalid) says it parsed cleanly and then failed the
 /// meta-schema.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum ParseError {
     /// The text was not well-formed JSON.
     Syntax(serde_json::Error),

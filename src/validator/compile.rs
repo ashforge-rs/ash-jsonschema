@@ -19,6 +19,7 @@ use crate::walk::walk_subschemas;
 
 /// A schema that cannot be turned into a validator.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum CompileError {
     /// A `pattern` or `patternProperties` key is not a regex this crate can
     /// compile.

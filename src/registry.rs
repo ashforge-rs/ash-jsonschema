@@ -83,6 +83,7 @@ impl Reference {
 
 /// A schema that could not be added to a registry.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RegistryError {
     /// Two schemas declared the same `$id`.
     ///

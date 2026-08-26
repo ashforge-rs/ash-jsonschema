@@ -227,30 +227,38 @@ assert_eq!(outcome.first().unwrap().message(), "`id` is required");
 "#
 )]
 //!
-//! A validator's schema is fixed for its life. `Mode::All` reports every error
-//! and `Mode::FailFast` stops at the first; both give an [`Outcome`] whose
-//! errors name where in the instance the problem is *and* which schema keyword
-//! rejected it.
-//!
-//! ## Output the specification defines
-//!
-//! An [`Outcome`] is the specification's output tree, not a shape of this
-//! crate's invention. [`Outcome::output`] renders it as any of the four
-//! formats 2020-12 describes — [`Flag`](OutputFormat::Flag),
-//! [`Basic`](OutputFormat::Basic), [`Detailed`](OutputFormat::Detailed),
-//! [`Verbose`](OutputFormat::Verbose) — and the result validates against
-//! `https://json-schema.org/draft/2020-12/output/schema`, so it can be read by
-//! tooling that knows the standard rather than this crate.
-//!
-//! Nesting is what makes a branching schema debuggable: a failed `anyOf` says
-//! only "no alternative matched", so the evaluator keeps *why each alternative
-//! was rejected* beneath it. [`Outcome::errors`] is the flat view of the same
-//! run, and [`Outcome::unit`] is the tree.
-//!
-//! [`Validator::annotate`] collects what the annotation keywords —
-//! `title`, `description`, `default`, `readOnly` — attached to each location.
-//! [`Validator::validate`] does not, since the usual question is whether an
-//! instance is valid and it should not pay for an answer it will not read.
+// The passage below names types that exist only with the `validation`
+// feature, so it is gated with them — an intra-doc link to a type that was
+// configured out is a hard rustdoc error, not a warning.
+#![cfg_attr(
+    feature = "validation",
+    doc = r#"
+A validator's schema is fixed for its life. `Mode::All` reports every error
+and `Mode::FailFast` stops at the first; both give an [`Outcome`] whose
+errors name where in the instance the problem is *and* which schema keyword
+rejected it.
+
+## Output the specification defines
+
+An [`Outcome`] is the specification's output tree, not a shape of this
+crate's invention. [`Outcome::output`] renders it as any of the four
+formats 2020-12 describes — [`Flag`](OutputFormat::Flag),
+[`Basic`](OutputFormat::Basic), [`Detailed`](OutputFormat::Detailed),
+[`Verbose`](OutputFormat::Verbose) — and the result validates against
+`https://json-schema.org/draft/2020-12/output/schema`, so it can be read by
+tooling that knows the standard rather than this crate.
+
+Nesting is what makes a branching schema debuggable: a failed `anyOf` says
+only "no alternative matched", so the evaluator keeps *why each alternative
+was rejected* beneath it. [`Outcome::errors`] is the flat view of the same
+run, and [`Outcome::unit`] is the tree.
+
+[`Validator::annotate`] collects what the annotation keywords —
+`title`, `description`, `default`, `readOnly` — attached to each location.
+[`Validator::validate`] does not, since the usual question is whether an
+instance is valid and it should not pay for an answer it will not read.
+"#
+)]
 //!
 //! Coverage is every assertion and applicator of the dialect, including
 //! `unevaluated*` and `$dynamicRef`.
