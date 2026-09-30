@@ -236,7 +236,10 @@ mod tests {
 
     #[test]
     fn percent_escapes_in_a_fragment_are_decoded() {
-        assert_eq!(decode_fragment("/$defs/percent%25field"), "/$defs/percent%field");
+        assert_eq!(
+            decode_fragment("/$defs/percent%25field"),
+            "/$defs/percent%field"
+        );
         assert_eq!(decode_fragment("/$defs/foo%22bar"), "/$defs/foo\"bar");
         assert_eq!(decode_fragment("/a%2Fb"), "/a/b");
         // Nothing to do, and nothing broken by trying.
@@ -249,8 +252,17 @@ mod tests {
 
     #[test]
     fn a_resource_is_the_uri_without_its_fragment() {
-        assert_eq!(resource_of("https://example.com/a#/b"), "https://example.com/a");
-        assert_eq!(resource_of("https://example.com/a#"), "https://example.com/a");
-        assert_eq!(resource_of("https://example.com/a"), "https://example.com/a");
+        assert_eq!(
+            resource_of("https://example.com/a#/b"),
+            "https://example.com/a"
+        );
+        assert_eq!(
+            resource_of("https://example.com/a#"),
+            "https://example.com/a"
+        );
+        assert_eq!(
+            resource_of("https://example.com/a"),
+            "https://example.com/a"
+        );
     }
 }

@@ -28,11 +28,18 @@ fn a_validator_answers_both_ways_about_the_same_instance() {
 
     // Every error, versus the first one only.
     assert_eq!(validator.validate(&instance, Mode::All).errors.len(), 2);
-    assert_eq!(validator.validate(&instance, Mode::FailFast).errors.len(), 1);
+    assert_eq!(
+        validator.validate(&instance, Mode::FailFast).errors.len(),
+        1
+    );
 
     assert!(!validator.is_valid(&instance));
     assert!(validator.check(&instance).is_err());
-    assert!(validator.check(&serde_json::json!({"a": "x", "b": "y"})).is_ok());
+    assert!(
+        validator
+            .check(&serde_json::json!({"a": "x", "b": "y"}))
+            .is_ok()
+    );
 }
 
 #[test]
@@ -230,10 +237,7 @@ fn a_failing_branch_keeps_every_alternatives_reason() {
     // The flat view gives the reasons, not the scaffolding.
     assert_eq!(outcome.errors.len(), 2);
     assert!(
-        outcome
-            .errors
-            .iter()
-            .all(|error| error.keyword() == "type"),
+        outcome.errors.iter().all(|error| error.keyword() == "type"),
         "each leaf is the `type` that rejected that branch",
     );
 }
@@ -348,7 +352,13 @@ fn a_reference_across_documents_needs_the_registry() {
     // The same schema without the registry cannot follow the reference.
     let alone = Validator::new(&user).unwrap();
     let outcome = alone.validate(&serde_json::json!({"address": {}}), Mode::All);
-    assert!(outcome.first().unwrap().message().contains("resolves to nothing"));
+    assert!(
+        outcome
+            .first()
+            .unwrap()
+            .message()
+            .contains("resolves to nothing")
+    );
 }
 
 #[test]

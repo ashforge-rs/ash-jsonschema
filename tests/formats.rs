@@ -75,9 +75,9 @@ fn a_rule_of_your_own_asserts_a_name_the_crate_does_not_know() {
 
     let validator = Validator::builder(&schema)
         .format("employee-id", |value| {
-            value.strip_prefix("E-").is_some_and(|rest| {
-                rest.len() == 5 && rest.chars().all(|c| c.is_ascii_digit())
-            })
+            value
+                .strip_prefix("E-")
+                .is_some_and(|rest| rest.len() == 5 && rest.chars().all(|c| c.is_ascii_digit()))
         })
         .build()
         .unwrap();

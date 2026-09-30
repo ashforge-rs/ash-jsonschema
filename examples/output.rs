@@ -56,9 +56,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // The branch that did not match contributes nothing: an annotation from a
     // rejected schema describes an instance that does not exist.
-    println!(
-        "\n(only the matching alternative annotates — `a bank transfer` is absent)",
-    );
+    println!("\n(only the matching alternative annotates — `a bank transfer` is absent)",);
 
     Ok(())
 }

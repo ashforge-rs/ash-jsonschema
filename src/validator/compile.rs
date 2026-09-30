@@ -134,7 +134,11 @@ impl Compiled {
 
     /// Records one resource: its anchors, its nested `$id`s, and its patterns.
     fn index(&mut self, uri: &str, document: Arc<Value>) -> Result<(), CompileError> {
-        if self.resources.insert(uri.to_owned(), Arc::clone(&document)).is_none() {
+        if self
+            .resources
+            .insert(uri.to_owned(), Arc::clone(&document))
+            .is_none()
+        {
             self.order.push(uri.to_owned());
         }
 
@@ -241,7 +245,12 @@ impl Compiled {
     /// Resolves a reference written under `base`, returning the target and the
     /// base in force inside it.
     #[cfg(test)]
-    pub(crate) fn resolve(&self, base: &str, target: &str, dynamic: bool) -> Option<(Value, String)> {
+    pub(crate) fn resolve(
+        &self,
+        base: &str,
+        target: &str,
+        dynamic: bool,
+    ) -> Option<(Value, String)> {
         self.resolve_in_scope(base, target, dynamic, &[])
             .map(|(value, base, _)| (value, base))
     }
@@ -409,10 +418,7 @@ mod tests {
 
     #[test]
     fn a_schema_with_no_id_gets_the_anonymous_base() {
-        let schema = Schema::object()
-            .def("A", Schema::string())
-            .build()
-            .unwrap();
+        let schema = Schema::object().def("A", Schema::string()).build().unwrap();
 
         let compiled = compile(&schema).unwrap();
         assert_eq!(compiled.base(), ANONYMOUS);
@@ -423,7 +429,11 @@ mod tests {
     fn a_reference_to_nothing_resolves_to_nothing() {
         let schema = Schema::object().build().unwrap();
         let compiled = compile(&schema).unwrap();
-        assert!(compiled.resolve(ANONYMOUS, "#/$defs/Missing", false).is_none());
+        assert!(
+            compiled
+                .resolve(ANONYMOUS, "#/$defs/Missing", false)
+                .is_none()
+        );
         assert!(
             compiled
                 .resolve(ANONYMOUS, "https://elsewhere.example/x", false)

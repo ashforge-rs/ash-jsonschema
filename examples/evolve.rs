@@ -81,10 +81,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     shipped.insert(&bundled)?;
     shipped.check_references()?;
 
-    println!(
-        "\nbundled {} resource(s) into one document:",
-        shipped.len()
-    );
+    println!("\nbundled {} resource(s) into one document:", shipped.len());
     for uri in shipped.resources() {
         println!("    {uri}");
     }

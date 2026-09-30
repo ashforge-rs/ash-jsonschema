@@ -730,7 +730,11 @@ mod tests {
     #[test]
     fn an_absolute_location_is_written_only_when_present() {
         let mut unit = error("/a");
-        assert!(unit.render(OutputFormat::Basic).get("absoluteKeywordLocation").is_none());
+        assert!(
+            unit.render(OutputFormat::Basic)
+                .get("absoluteKeywordLocation")
+                .is_none()
+        );
 
         unit.absolute_keyword_location = Some("https://example.com/s#/type".to_owned());
         let rendered = unit.render(OutputFormat::Basic);

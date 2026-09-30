@@ -172,13 +172,7 @@ mod tests {
 
         assert_eq!(
             pointers(&document),
-            [
-                "",
-                "/not",
-                "/allOf/0",
-                "/allOf/1",
-                "/properties/a",
-            ],
+            ["", "/not", "/allOf/0", "/allOf/1", "/properties/a",],
         );
     }
 

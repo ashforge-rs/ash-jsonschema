@@ -116,10 +116,12 @@ fn embed_name(uri: &str, taken: &BTreeMap<String, String>) -> String {
 
     let sanitized: String = stem
         .chars()
-        .map(|character| match character.is_alphanumeric() || character == '-' {
-            true => character,
-            false => '_',
-        })
+        .map(
+            |character| match character.is_alphanumeric() || character == '-' {
+                true => character,
+                false => '_',
+            },
+        )
         .collect();
     let base = match sanitized.is_empty() {
         true => "embedded".to_owned(),
@@ -546,7 +548,10 @@ mod tests {
         let taken = BTreeMap::new();
         assert_eq!(embed_name("https://example.com/address", &taken), "address");
         assert_eq!(embed_name("https://example.com/a/b/thing", &taken), "thing");
-        assert_eq!(embed_name("https://example.com/trailing/", &taken), "trailing");
+        assert_eq!(
+            embed_name("https://example.com/trailing/", &taken),
+            "trailing"
+        );
         // A segment that is not a usable name is sanitized.
         assert_eq!(embed_name("urn:example:thing", &taken), "urn_example_thing");
     }

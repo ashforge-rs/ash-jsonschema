@@ -127,8 +127,8 @@ fn macro_output_is_valid_2020_12() {
 /// diffs like any other.
 #[test]
 fn a_macro_written_schema_works_with_the_rest_of_the_crate() {
-    use ash_jsonschema::diff::{Role, diff};
     use ash_jsonschema::Registry;
+    use ash_jsonschema::diff::{Role, diff};
 
     let v1 = object! {
         required "id": Schema::string(),

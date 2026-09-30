@@ -158,13 +158,7 @@ impl Evaluator<'_> {
     /// crossed a reference — which is exactly when the keyword path stops
     /// naming a place you can find, and exactly when the specification
     /// requires it.
-    fn unit(
-        &self,
-        at: Where<'_>,
-        keyword: &str,
-        error: Option<String>,
-        valid: bool,
-    ) -> Unit {
+    fn unit(&self, at: Where<'_>, keyword: &str, error: Option<String>, valid: bool) -> Unit {
         let keyword_location = match keyword.is_empty() {
             true => at.keyword.to_owned(),
             false => format!("{}/{keyword}", at.keyword),
@@ -248,10 +242,7 @@ impl Evaluator<'_> {
         // a branch has to say counts only if the branch matched, and that is
         // not known until it has run. The caller keeps them with
         // `keep_annotations` or drops them by doing nothing.
-        let held = self
-            .annotations
-            .as_mut()
-            .map(std::mem::take);
+        let held = self.annotations.as_mut().map(std::mem::take);
         let value = body(self);
         self.silent -= 1;
         let collected = self.frames.pop().unwrap_or_default();
@@ -274,12 +265,7 @@ impl Evaluator<'_> {
 
     /// Evaluates `schema` against `instance`, returning whether it matched and
     /// what it evaluated.
-    fn eval(
-        &mut self,
-        schema: &Value,
-        instance: &Value,
-        at: Where<'_>,
-    ) -> (bool, Evaluated) {
+    fn eval(&mut self, schema: &Value, instance: &Value, at: Where<'_>) -> (bool, Evaluated) {
         let map = match schema {
             Value::Bool(true) => return (true, Evaluated::default()),
             Value::Bool(false) => {
@@ -291,9 +277,7 @@ impl Evaluator<'_> {
                     Some("additionalProperties" | "unevaluatedProperties") => {
                         "is not a permitted property"
                     }
-                    Some("items" | "unevaluatedItems" | "prefixItems") => {
-                        "is not a permitted item"
-                    }
+                    Some("items" | "unevaluatedItems" | "prefixItems") => "is not a permitted item",
                     _ => "no value is valid here",
                 };
                 self.report(at, "", message);
@@ -769,7 +753,9 @@ impl Evaluator<'_> {
                 if !object.contains_key(trigger) {
                     continue;
                 }
-                let Some(names) = names.as_array() else { continue };
+                let Some(names) = names.as_array() else {
+                    continue;
+                };
                 for name in names.iter().filter_map(Value::as_str) {
                     if !object.contains_key(name) {
                         self.report(
@@ -815,21 +801,22 @@ impl Evaluator<'_> {
                 let Some(regex) = self.compiled.regex(pattern) else {
                     continue;
                 };
-                let names: Vec<&String> = object
-                    .keys()
-                    .filter(|name| regex.is_match(name))
-                    .collect();
+                let names: Vec<&String> =
+                    object.keys().filter(|name| regex.is_match(name)).collect();
                 for name in names {
                     let token = escape_pointer_token(name);
-                    let keyword =
-                        format!("{}/patternProperties/{}", at.keyword, escape_pointer_token(pattern));
+                    let keyword = format!(
+                        "{}/patternProperties/{}",
+                        at.keyword,
+                        escape_pointer_token(pattern)
+                    );
                     let location = format!("{}/{token}", at.location);
                     let inner = Where {
                         keyword: &keyword,
                         location: &location,
                         base: at.base,
-                    resolved: at.resolved,
-                    dynamic: at.dynamic,
+                        resolved: at.resolved,
+                        dynamic: at.dynamic,
                     };
                     let (ok, _) = self.eval(schema, &object[name], inner);
                     valid &= ok;
@@ -1057,8 +1044,8 @@ impl Evaluator<'_> {
                 keyword: &keyword,
                 location: at.location,
                 base: at.base,
-                    resolved: at.resolved,
-                    dynamic: at.dynamic,
+                resolved: at.resolved,
+                dynamic: at.dynamic,
             };
             let ((ok, _), _) = self.silently(|me| me.eval(schema, instance, inner));
             if ok {
@@ -1078,8 +1065,8 @@ impl Evaluator<'_> {
                 keyword: &keyword,
                 location: at.location,
                 base: at.base,
-                    resolved: at.resolved,
-                    dynamic: at.dynamic,
+                resolved: at.resolved,
+                dynamic: at.dynamic,
             };
             let ((matched, seen), _) = self.silently(|me| me.eval(condition, instance, inner));
 
@@ -1330,9 +1317,9 @@ fn json_eq(left: &Value, right: &Value) -> bool {
         }
         (Value::Object(left), Value::Object(right)) => {
             left.len() == right.len()
-                && left.iter().all(|(key, value)| {
-                    right.get(key).is_some_and(|other| json_eq(value, other))
-                })
+                && left
+                    .iter()
+                    .all(|(key, value)| right.get(key).is_some_and(|other| json_eq(value, other)))
         }
         _ => left == right,
     }
@@ -1359,8 +1346,7 @@ fn as_count(value: &Value) -> Option<u64> {
         return Some(count);
     }
     let number = value.as_f64()?;
-    (number.fract() == 0.0 && number >= 0.0 && number <= u64::MAX as f64)
-        .then_some(number as u64)
+    (number.fract() == 0.0 && number >= 0.0 && number <= u64::MAX as f64).then_some(number as u64)
 }
 
 /// A pointer into an array element.

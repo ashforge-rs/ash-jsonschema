@@ -27,9 +27,7 @@ fn flag_is_the_verdict_and_nothing_else() {
 /// Every unit carries the two locations the specification requires.
 #[test]
 fn basic_units_carry_both_required_locations() {
-    let validator = validator(
-        r#"{"properties": {"age": {"type": "integer", "minimum": 18}}}"#,
-    );
+    let validator = validator(r#"{"properties": {"age": {"type": "integer", "minimum": 18}}}"#);
     let outcome = validator.validate(&json!({"age": 3}), Mode::All);
 
     let output = outcome.output(OutputFormat::Basic);
@@ -43,9 +41,8 @@ fn basic_units_carry_both_required_locations() {
 /// `basic` is flat by definition: no unit in it holds nested units.
 #[test]
 fn basic_output_flattens_a_nested_failure() {
-    let validator = validator(
-        r#"{"anyOf": [{"type": "string"}, {"type": "integer", "minimum": 10}]}"#,
-    );
+    let validator =
+        validator(r#"{"anyOf": [{"type": "string"}, {"type": "integer", "minimum": 10}]}"#);
     let outcome = validator.validate(&json!(3), Mode::All);
 
     let output = outcome.output(OutputFormat::Basic);
@@ -62,9 +59,8 @@ fn basic_output_flattens_a_nested_failure() {
 /// was rejected, which the top-level message alone cannot say.
 #[test]
 fn detailed_output_keeps_each_alternatives_reason() {
-    let validator = validator(
-        r#"{"anyOf": [{"type": "string"}, {"type": "integer", "minimum": 10}]}"#,
-    );
+    let validator =
+        validator(r#"{"anyOf": [{"type": "string"}, {"type": "integer", "minimum": 10}]}"#);
     let outcome = validator.validate(&json!(3), Mode::All);
 
     let output = outcome.output(OutputFormat::Detailed);
@@ -86,9 +82,7 @@ fn detailed_output_keeps_each_alternatives_reason() {
 /// `verbose` is the only format that reports what succeeded.
 #[test]
 fn verbose_keeps_passing_units_where_detailed_drops_them() {
-    let validator = validator(
-        r#"{"allOf": [{"type": "integer"}], "minimum": 10}"#,
-    );
+    let validator = validator(r#"{"allOf": [{"type": "integer"}], "minimum": 10}"#);
     let outcome = validator.validate(&json!(3), Mode::All);
 
     let detailed = outcome.output(OutputFormat::Detailed);
@@ -162,8 +156,18 @@ fn annotations_are_collected_only_when_asked_for() {
     let validator = validator(r#"{"title": "Root", "type": "string"}"#);
     let instance = json!("ok");
 
-    assert!(validator.validate(&instance, Mode::All).annotations.is_empty());
-    assert!(!validator.annotate(&instance, Mode::All).annotations.is_empty());
+    assert!(
+        validator
+            .validate(&instance, Mode::All)
+            .annotations
+            .is_empty()
+    );
+    assert!(
+        !validator
+            .annotate(&instance, Mode::All)
+            .annotations
+            .is_empty()
+    );
 }
 
 #[test]
@@ -196,7 +200,12 @@ fn a_failed_run_reports_no_annotations() {
 
     assert!(!outcome.is_valid());
     assert!(outcome.annotations.is_empty());
-    assert!(outcome.output(OutputFormat::Basic).get("annotations").is_none());
+    assert!(
+        outcome
+            .output(OutputFormat::Basic)
+            .get("annotations")
+            .is_none()
+    );
 }
 
 /// An annotation from an alternative that did not match is not kept, even

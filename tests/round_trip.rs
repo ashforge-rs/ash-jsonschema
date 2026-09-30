@@ -112,8 +112,8 @@ fn parse_checked_distinguishes_bad_json_from_a_bad_schema() {
 /// A parsed schema goes back into a builder and picks up more keywords.
 #[test]
 fn a_parsed_schema_resumes_as_a_builder() {
-    let parsed = Schema::parse(r#"{"type":"object","properties":{"id":{"type":"string"}}}"#)
-        .unwrap();
+    let parsed =
+        Schema::parse(r#"{"type":"object","properties":{"id":{"type":"string"}}}"#).unwrap();
 
     let extended = parsed
         .into_builder()
@@ -134,7 +134,11 @@ fn resuming_under_a_type_marker_reopens_its_vocabulary() {
     let parsed = Schema::parse(r#"{"type":"string","minLength":1}"#).unwrap();
 
     let tightened: StringBuilder = parsed.into_typed();
-    let schema = tightened.max_length(64).pattern("^[a-z]+$").build().unwrap();
+    let schema = tightened
+        .max_length(64)
+        .pattern("^[a-z]+$")
+        .build()
+        .unwrap();
 
     assert_eq!(
         schema.to_json(),
@@ -146,7 +150,11 @@ fn resuming_under_a_type_marker_reopens_its_vocabulary() {
 /// empty builder rather than by failing.
 #[test]
 fn a_boolean_schema_resumes_as_an_empty_builder() {
-    let resumed = Schema::anything().into_builder().title("anything").build().unwrap();
+    let resumed = Schema::anything()
+        .into_builder()
+        .title("anything")
+        .build()
+        .unwrap();
     assert_eq!(resumed.to_json(), r#"{"title":"anything"}"#);
 }
 
@@ -160,7 +168,10 @@ fn the_inspection_helpers_reach_the_common_places() {
         .build()
         .unwrap();
 
-    assert_eq!(schema.schema_type(), Some(&TypeSet::One(SchemaType::Object)));
+    assert_eq!(
+        schema.schema_type(),
+        Some(&TypeSet::One(SchemaType::Object))
+    );
     assert!(schema.property("id").is_some());
     assert!(schema.property("nothing").is_none());
     assert!(schema.requires("id"));
@@ -186,7 +197,10 @@ fn a_violation_location_resolves_against_the_schema_it_came_from() {
     let location = &error.first().location;
 
     assert_eq!(location, "/properties/inner/$anchor");
-    assert_eq!(schema.pointer(location), Some(serde_json::json!("not an anchor")));
+    assert_eq!(
+        schema.pointer(location),
+        Some(serde_json::json!("not an anchor"))
+    );
 }
 
 /// The object conveniences write the same document the long form does.

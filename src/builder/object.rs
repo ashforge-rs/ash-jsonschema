@@ -67,9 +67,11 @@ impl Builder<kind::Object> {
         N: Into<String>,
         S: Into<Schema>,
     {
-        properties.into_iter().fold(self, |builder, (name, schema)| {
-            builder.required_property(name, schema)
-        })
+        properties
+            .into_iter()
+            .fold(self, |builder, (name, schema)| {
+                builder.required_property(name, schema)
+            })
     }
 
     /// Adds one entry to `properties` and marks it required when `required` is

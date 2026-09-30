@@ -305,9 +305,9 @@ pub mod meta;
 pub mod registry;
 pub mod schema;
 pub mod uri;
+mod validate;
 #[cfg(feature = "validation")]
 pub mod validator;
-mod validate;
 pub mod walk;
 
 pub use builder::{
@@ -327,9 +327,7 @@ pub use schema::{
 };
 pub use validate::validate_document;
 #[cfg(feature = "validation")]
-pub use validator::{
-    CompileError, Mode, Outcome, OutputFormat, Unit, ValidationError, Validator,
-};
+pub use validator::{CompileError, Mode, Outcome, OutputFormat, Unit, ValidationError, Validator};
 
 /// The types a typical caller wants in scope.
 ///
@@ -340,7 +338,6 @@ pub use validator::{
 /// ```
 pub mod prelude {
     pub use crate::{
-        Format, Num, ParseError, Schema, SchemaError, SchemaObject, SchemaType, TypeSet,
-        Violation,
+        Format, Num, ParseError, Schema, SchemaError, SchemaObject, SchemaType, TypeSet, Violation,
     };
 }

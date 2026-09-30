@@ -40,7 +40,11 @@ fn a_schema_without_an_id_still_resolves_its_own_references() {
     registry.insert(&schema).unwrap();
 
     assert!(registry.contains(ANONYMOUS));
-    assert!(registry.resolve(&format!("{ANONYMOUS}#/$defs/Name")).is_some());
+    assert!(
+        registry
+            .resolve(&format!("{ANONYMOUS}#/$defs/Name"))
+            .is_some()
+    );
     registry.check_references().unwrap();
 }
 
@@ -250,7 +254,10 @@ fn a_nested_id_becomes_its_own_resource() {
 fn a_relative_nested_id_resolves_against_its_enclosing_base() {
     let schema = Schema::object()
         .id("https://example.com/schemas/root")
-        .def("Inner", Schema::object().id("inner").def("Deep", Schema::string()))
+        .def(
+            "Inner",
+            Schema::object().id("inner").def("Deep", Schema::string()),
+        )
         .build()
         .unwrap();
 
@@ -305,7 +312,11 @@ fn mutually_referencing_documents_resolve() {
     registry.insert(&b).unwrap();
 
     registry.check_references().unwrap();
-    assert!(registry.resolve("https://example.com/a#/properties/b").is_some());
+    assert!(
+        registry
+            .resolve("https://example.com/a#/properties/b")
+            .is_some()
+    );
 }
 
 /// A `$dynamicAnchor` is reachable, and an ordinary `$ref` may name it too.
@@ -314,14 +325,21 @@ fn a_dynamic_anchor_is_reachable_by_both_reference_forms() {
     let schema = Schema::object()
         .id("https://example.com/tree")
         .dynamic_anchor("node")
-        .property("children", Schema::array().items(Schema::builder().dynamic_ref("#node")))
+        .property(
+            "children",
+            Schema::array().items(Schema::builder().dynamic_ref("#node")),
+        )
         .build()
         .unwrap();
 
     let mut registry = Registry::new();
     registry.insert(&schema).unwrap();
 
-    assert!(registry.resolve_dynamic("https://example.com/tree#node").is_some());
+    assert!(
+        registry
+            .resolve_dynamic("https://example.com/tree#node")
+            .is_some()
+    );
     // Per 2020-12 core, a `$dynamicAnchor` is also a plain-name `$ref` target.
     assert!(registry.resolve("https://example.com/tree#node").is_some());
 
@@ -535,7 +553,10 @@ fn a_nested_resource_resolves_pointers_from_its_own_root() {
 
     // `#` on the inner resource is the inner schema, not the document root.
     let inner = registry.resolve("https://example.com/inner").unwrap();
-    assert_eq!(inner.get("title"), Some(&serde_json::json!("the inner one")));
+    assert_eq!(
+        inner.get("title"),
+        Some(&serde_json::json!("the inner one"))
+    );
 
     let deep = registry
         .resolve("https://example.com/inner#/$defs/Deep")

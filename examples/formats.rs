@@ -57,7 +57,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "runs_for": "P1Y2M",
         "ticket": "ASH-1042",
     });
-    println!("a well-formed record: {}\n", strict.validate(&good, Mode::All));
+    println!(
+        "a well-formed record: {}\n",
+        strict.validate(&good, Mode::All)
+    );
 
     // The calendar is checked, not just the shape.
     println!("dates are real dates:");

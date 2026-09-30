@@ -949,8 +949,6 @@ mod tests {
         );
     }
 
-
-
     #[test]
     fn json_equality_compares_numbers_by_value() {
         assert!(json_eq(&serde_json::json!(1), &serde_json::json!(1.0)));

@@ -635,7 +635,10 @@ pub struct SchemaObject {
     /// As with [`constant`](Self::constant), an explicit `null` is kept as
     /// `Some(Value::Null)` rather than being conflated with the keyword's
     /// absence.
-    #[serde(skip_serializing_if = "Option::is_none", deserialize_with = "present_or_absent")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "present_or_absent"
+    )]
     pub default: Option<Value>,
     /// `examples` — sample instances, asserted by nothing.
     #[serde(skip_serializing_if = "Option::is_none")]

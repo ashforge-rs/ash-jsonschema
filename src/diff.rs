@@ -510,10 +510,7 @@ impl Differ<'_> {
 
         // An `$id` here rebases every relative `$ref` beneath it.
         let outer = self.bases.clone();
-        self.bases = (
-            rebase(&outer.0, before_map),
-            rebase(&outer.1, after_map),
-        );
+        self.bases = (rebase(&outer.0, before_map), rebase(&outer.1, after_map));
 
         self.compare_properties(before_map, after_map, location);
         self.compare_keywords(before_map, after_map, location);
@@ -539,7 +536,9 @@ impl Differ<'_> {
         let before_target = before_registry
             .resolve_from(&self.bases.0, before_ref)?
             .clone();
-        let after_target = after_registry.resolve_from(&self.bases.1, after_ref)?.clone();
+        let after_target = after_registry
+            .resolve_from(&self.bases.1, after_ref)?
+            .clone();
 
         let key = (
             absolute(&self.bases.0, before_ref),
@@ -575,14 +574,12 @@ impl Differ<'_> {
                 Some(after_schema) => {
                     let is_required = after_required.contains(name);
                     match (was_required, is_required) {
-                        (false, true) => self.report(
-                            location,
-                            ChangeKind::PropertyBecameRequired(name.clone()),
-                        ),
-                        (true, false) => self.report(
-                            location,
-                            ChangeKind::PropertyBecameOptional(name.clone()),
-                        ),
+                        (false, true) => {
+                            self.report(location, ChangeKind::PropertyBecameRequired(name.clone()))
+                        }
+                        (true, false) => {
+                            self.report(location, ChangeKind::PropertyBecameOptional(name.clone()))
+                        }
                         _ => {}
                     }
                     let nested = format!(
@@ -611,19 +608,13 @@ impl Differ<'_> {
             if after_properties.contains_key(name) || before_required.contains(name) {
                 continue;
             }
-            self.report(
-                location,
-                ChangeKind::AddedRequiredProperty(name.clone()),
-            );
+            self.report(location, ChangeKind::AddedRequiredProperty(name.clone()));
         }
         for name in &before_required {
             if before_properties.contains_key(name) || after_required.contains(name) {
                 continue;
             }
-            self.report(
-                location,
-                ChangeKind::PropertyBecameOptional(name.clone()),
-            );
+            self.report(location, ChangeKind::PropertyBecameOptional(name.clone()));
         }
     }
 
@@ -699,10 +690,7 @@ impl Differ<'_> {
             }
 
             if ANNOTATIONS.contains(&keyword) {
-                self.report(
-                    location,
-                    ChangeKind::AnnotationChanged(keyword.to_owned()),
-                );
+                self.report(location, ChangeKind::AnnotationChanged(keyword.to_owned()));
                 continue;
             }
 
@@ -1177,10 +1165,7 @@ mod tests {
 
         let report = diff(&before, &after);
         assert_eq!(report.changes.len(), 1);
-        assert!(matches!(
-            report.changes[0].kind,
-            ChangeKind::Changed { .. }
-        ));
+        assert!(matches!(report.changes[0].kind, ChangeKind::Changed { .. }));
 
         // The same target on both sides is no change at all.
         assert!(diff(&before, &before).is_empty());

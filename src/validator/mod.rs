@@ -478,9 +478,7 @@ mod tests {
         let handles: Vec<_> = (0..4)
             .map(|_| {
                 let validator = validator.clone();
-                std::thread::spawn(move || {
-                    validator.is_valid(&serde_json::json!({"id": "x"}))
-                })
+                std::thread::spawn(move || validator.is_valid(&serde_json::json!({"id": "x"})))
             })
             .collect();
 

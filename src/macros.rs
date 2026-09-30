@@ -145,8 +145,12 @@ macro_rules! defs {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! defs_name {
-    (($name:expr)) => { $name };
-    ($name:literal) => { $name };
+    (($name:expr)) => {
+        $name
+    };
+    ($name:literal) => {
+        $name
+    };
 }
 
 /// A `oneOf` over object schemas discriminated by a constant property — the

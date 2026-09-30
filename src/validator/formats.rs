@@ -213,10 +213,7 @@ fn parse_time(value: &str) -> Option<&str> {
     // An optional fraction of a second: `.` and at least one digit.
     let rest = match rest.strip_prefix('.') {
         Some(fraction) => {
-            let taken = fraction
-                .bytes()
-                .take_while(u8::is_ascii_digit)
-                .count();
+            let taken = fraction.bytes().take_while(u8::is_ascii_digit).count();
             if taken == 0 {
                 return None;
             }
@@ -314,10 +311,7 @@ fn units_in_order(text: &str, order: &str) -> bool {
     let mut previous: Option<usize> = None;
 
     while !remaining.is_empty() {
-        let taken = remaining
-            .bytes()
-            .take_while(u8::is_ascii_digit)
-            .count();
+        let taken = remaining.bytes().take_while(u8::is_ascii_digit).count();
         if taken == 0 {
             return false;
         }
@@ -478,9 +472,10 @@ pub fn is_email(value: &str) -> bool {
     }
     // The dot-atom grammar is ASCII, and excludes the specials that only the
     // quoted form permits.
-    if !local.chars().all(|character| {
-        character.is_ascii_graphic() && !r#"()<>[]:;@\,""#.contains(character)
-    }) {
+    if !local
+        .chars()
+        .all(|character| character.is_ascii_graphic() && !r#"()<>[]:;@\,""#.contains(character))
+    {
         return false;
     }
     // A bracketed address literal is legal in place of a domain name.
@@ -530,12 +525,9 @@ pub fn is_uuid(value: &str) -> bool {
     if groups.len() != 5 {
         return false;
     }
-    [8, 4, 4, 4, 12]
-        .iter()
-        .zip(&groups)
-        .all(|(width, group)| {
-            group.len() == *width && group.bytes().all(|byte| byte.is_ascii_hexdigit())
-        })
+    [8, 4, 4, 4, 12].iter().zip(&groups).all(|(width, group)| {
+        group.len() == *width && group.bytes().all(|byte| byte.is_ascii_hexdigit())
+    })
 }
 
 /// An RFC 6901 JSON Pointer: empty, or `/`-prefixed tokens whose only `~` is

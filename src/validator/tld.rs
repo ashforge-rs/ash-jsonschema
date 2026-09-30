@@ -63,9 +63,7 @@ pub fn is_tld_shaped(label: &str) -> bool {
                 .all(|c| c.is_ascii_alphanumeric() || c == '-');
     }
 
-    label.len() >= 2
-        && label.len() <= 63
-        && label.chars().all(|c| c.is_ascii_alphabetic())
+    label.len() >= 2 && label.len() <= 63 && label.chars().all(|c| c.is_ascii_alphabetic())
 }
 
 /// Whether a hostname ends in a label shaped like a TLD.
