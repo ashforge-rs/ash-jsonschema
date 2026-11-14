@@ -4,6 +4,12 @@ All notable changes to this crate are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this crate adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-11-14
+
+### Changed
+
+- Dependency updates: `serde_json` 1.0.154.
+
 ## [0.1.0] — 2026-08-26
 
 First release. A typed builder for JSON Schema 2020-12, plus the machinery for
@@ -92,4 +98,5 @@ needing Unicode property escapes (`regex-lite` does not implement them), and —
 in the optional `format` tests — `xn--` punycode decoding and quoted email
 local parts, both of which need full IDNA rules.
 
+[0.1.1]: https://github.com/ashforge-rs/ash-jsonschema/releases/tag/v0.1.1
 [0.1.0]: https://github.com/ashforge-rs/ash-jsonschema/releases/tag/v0.1.0
